@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sirius H&amp;S</string>
+    <string name="title_activity_main">Sirius H&amp;S</string>
+    <string name="package_name">com.siriushs.app</string>
+    <string name="custom_url_scheme">com.siriushs.app</string>
+</resources>
