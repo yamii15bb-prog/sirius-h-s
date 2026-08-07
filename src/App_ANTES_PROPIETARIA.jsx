@@ -1,13 +1,6 @@
  import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
-// Sirius H&S — Modo propietaria
-// En la versión actual no existe todavía un sistema de cuentas/autenticación.
-// Por eso este modo identifica la instalación de la creadora durante las pruebas.
-// Antes de publicar para usuarios reales, OWNER_MODE debe sustituirse por
-// una validación de cuenta en servidor.
-const OWNER_MODE = true;
-
 function App() {
   const [activeSection, setActiveSection] = useState("inicio");
   const [showCreateEvent, setShowCreateEvent] = useState(false);
@@ -17,10 +10,6 @@ function App() {
   // Sirius H&S Premium: estado local de acceso.
   // IMPORTANTE: la activación real de pago debe validarse en un backend.
   const [premiumEnabled, setPremiumEnabled] = useState(() => {
-    if (OWNER_MODE) {
-      return true;
-    }
-
     return localStorage.getItem("siriusHS_premium") === "true";
   });
 
@@ -93,14 +82,6 @@ function App() {
   };
 
   const deactivatePremium = () => {
-    if (OWNER_MODE) {
-      setPremiumEnabled(true);
-      setPremiumMessage(
-        "👑 Modo propietaria activo: tu acceso Premium no se puede desactivar."
-      );
-      return;
-    }
-
     setPremiumEnabled(false);
     setPremiumMessage("Premium desactivado en este dispositivo.");
   };
@@ -1557,15 +1538,7 @@ function App() {
               ))}
             </ul>
 
-            {OWNER_MODE ? (
-              <button
-                className="create-button premium-button"
-                type="button"
-                disabled
-              >
-                👑 Premium de propietaria — ACTIVO
-              </button>
-            ) : !premiumEnabled ? (
+            {!premiumEnabled ? (
               <button
                 className="create-button premium-button"
                 onClick={activatePremiumDemo}
