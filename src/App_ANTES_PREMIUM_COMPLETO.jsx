@@ -7,14 +7,6 @@ function App() {
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [selectedInvitation, setSelectedInvitation] = useState(null);
 
-  // Sirius H&S Premium: estado local de acceso.
-  // IMPORTANTE: la activación real de pago debe validarse en un backend.
-  const [premiumEnabled, setPremiumEnabled] = useState(() => {
-    return localStorage.getItem("siriusHS_premium") === "true";
-  });
-
-  const [premiumMessage, setPremiumMessage] = useState("");
-
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem("siriusHS_events");
     return saved ? JSON.parse(saved) : [];
@@ -65,39 +57,10 @@ function App() {
   }, [guests]);
 
   useEffect(() => {
-    localStorage.setItem("siriusHS_premium", String(premiumEnabled));
-  }, [premiumEnabled]);
-
-  useEffect(() => {
     return () => {
       stopCamera();
     };
   }, []);
-
-  const activatePremiumDemo = () => {
-    setPremiumEnabled(true);
-    setPremiumMessage(
-      "Premium activado en este dispositivo. Para cobrar pagos reales, conecta una pasarela y valida el pago en un servidor."
-    );
-  };
-
-  const deactivatePremium = () => {
-    setPremiumEnabled(false);
-    setPremiumMessage("Premium desactivado en este dispositivo.");
-  };
-
-  const requirePremium = (action) => {
-    if (premiumEnabled) {
-      if (typeof action === "function") action();
-      return true;
-    }
-
-    setActiveSection("premium");
-    setPremiumMessage(
-      "Esta herramienta pertenece a Sirius H&S Premium. Activa Premium para continuar."
-    );
-    return false;
-  };
 
   const changeSection = (section) => {
     if (section !== "confirmaciones") {
@@ -1450,64 +1413,71 @@ function App() {
   };
 
   const renderPremium = () => {
-    const premiumFeatures = [
-      "Invitaciones premium",
-      "Diseños exclusivos",
-      "Personalización avanzada",
-      "Mapas estilizados",
-      "Animaciones avanzadas",
-      "Música y voz",
-      "Avatares",
-      "Herramientas de referencia visual",
-    ];
-
     return (
       <section className="content-section">
+
         <div className="section-heading">
           <div>
-            <span className="hero-label">SIRIUS H&S</span>
-            <h3>Desbloqueos Premium</h3>
+            <span className="hero-label">
+              SIRIUS H&S
+            </span>
+
+            <h3>
+              Desbloqueos Premium
+            </h3>
+
             <p>
-              Administra el acceso a las funciones avanzadas de Sirius H&S.
+              Comienza gratis y desbloquea
+              funciones premium cuando las necesites.
             </p>
           </div>
         </div>
 
         <div className="premium-hero">
-          <div className="premium-crown">♛</div>
+
+          <div className="premium-crown">
+            ♛
+          </div>
+
           <div>
-            <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
+            <span className="premium-label">
+              EXPERIENCIA SIRIUS H&S
+            </span>
+
             <h2>
-              {premiumEnabled
-                ? "Premium está activo"
-                : "Lleva tus invitaciones al siguiente nivel"}
+              Lleva tus invitaciones
+              al siguiente nivel
             </h2>
+
             <p>
-              {premiumEnabled
-                ? "Las funciones Premium están habilitadas en este dispositivo."
-                : "Diseños, mapas, animaciones y herramientas creativas avanzadas."}
+              Una experiencia elegante,
+              exclusiva y personalizable.
             </p>
           </div>
+
         </div>
 
-        {premiumMessage && (
-          <div
-            className="stat-card"
-            style={{ marginTop: "18px" }}
-            role="status"
-          >
-            {premiumMessage}
-          </div>
-        )}
-
         <div className="premium-plans">
+
           <div className="premium-card free-plan">
-            <span className="plan-badge">GRATIS</span>
-            <h3>Plan Gratis</h3>
+
+            <span className="plan-badge">
+              GRATIS
+            </span>
+
+            <h3>
+              Plan Gratis
+            </h3>
+
             <div className="plan-price">
               $0 <small>MXN</small>
             </div>
-            <p>Todo lo necesario para comenzar a crear tus eventos.</p>
+
+            <p>
+              Todo lo necesario para comenzar
+              a crear tus eventos.
+            </p>
+
             <ul>
               <li>✓ Crear eventos</li>
               <li>✓ Administrar invitados</li>
@@ -1517,71 +1487,77 @@ function App() {
               <li>✓ Mapa del evento</li>
               <li>✓ Invitación digital</li>
             </ul>
-            <button className="outline-button" disabled>
-              {premiumEnabled ? "Plan disponible" : "Plan actual"}
+
+            <button
+              className="outline-button"
+              disabled
+            >
+              Plan actual
             </button>
+
           </div>
 
           <div className="premium-card premium-plan">
-            <div className="crown-realistic">♛</div>
-            <span className="plan-badge premium-badge">PREMIUM</span>
-            <h3>Sirius H&S Premium</h3>
-            <div className="plan-price">
-              {premiumEnabled ? "ACTIVO" : "Acceso Premium"}
+
+            <div className="crown-realistic">
+              ♛
             </div>
+
+            <span className="plan-badge premium-badge">
+              PREMIUM
+            </span>
+
+            <h3>
+              Sirius H&S Premium
+            </h3>
+
+            <div className="plan-price">
+              Próximamente
+            </div>
+
             <p>
-              Desbloquea una experiencia más exclusiva para tus eventos.
+              Desbloquea una experiencia más
+              exclusiva para tus eventos.
             </p>
+
             <ul>
-              {premiumFeatures.map((feature) => (
-                <li key={feature}>✓ {feature}</li>
-              ))}
+              <li>✓ Todo lo incluido en Gratis</li>
+              <li>✓ Invitaciones premium</li>
+              <li>✓ Diseños exclusivos</li>
+              <li>✓ Personalización avanzada</li>
+              <li>✓ Herramientas premium</li>
+              <li>✓ Funciones adicionales futuras</li>
+              <li>✓ Experiencia Sirius H&S</li>
             </ul>
 
-            {!premiumEnabled ? (
-              <button
-                className="create-button premium-button"
-                onClick={activatePremiumDemo}
-              >
-                ♛ Activar Premium (prueba)
-              </button>
-            ) : (
-              <button
-                className="outline-button"
-                onClick={deactivatePremium}
-              >
-                Desactivar en este dispositivo
-              </button>
-            )}
+            <button
+              className="create-button premium-button"
+              onClick={() =>
+                alert(
+                  "Sirius H&S Premium estará disponible próximamente."
+                )
+              }
+            >
+              ♛ Desbloquear Premium
+            </button>
+
           </div>
+
         </div>
 
         <div className="premium-note">
-          <strong>♛ Sirius H&S</strong>
+
+          <strong>
+            ♛ Sirius H&S
+          </strong>
+
           <p>
-            El acceso Premium se guarda localmente para esta instalación.
-            La activación de pago real todavía requiere un servidor y una
-            pasarela de pagos; nunca debe confiarse únicamente en localStorage.
+            La versión gratuita seguirá disponible.
+            Las funciones Premium serán opcionales.
           </p>
+
         </div>
 
-        <div className="premium-card" style={{ marginTop: "20px" }}>
-          <span className="plan-badge">ESTADO DEL SISTEMA</span>
-          <h3>{premiumEnabled ? "Premium habilitado" : "Plan Gratis activo"}</h3>
-          <p>
-            {premiumEnabled
-              ? "Ya puedes conectar aquí las herramientas avanzadas de Sirius H&S."
-              : "Las funciones gratuitas siguen funcionando normalmente. Las funciones Premium pueden protegerse mediante requirePremium()."}
-          </p>
-          {!premiumEnabled && (
-            <button
-              className="outline-button"
-              onClick={() => requirePremium()}
-            >
-              Probar protección Premium
-            </button>
-          )}
-        </div>
       </section>
     );
   };
@@ -1755,7 +1731,7 @@ function App() {
               </strong>
 
               <span>
-                {premiumEnabled ? "Plan Premium" : "Plan Gratis"}
+                Plan Gratis
               </span>
             </div>
 
