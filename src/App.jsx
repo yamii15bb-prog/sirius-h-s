@@ -1,22 +1,31 @@
-﻿ import { useEffect, useRef, useState } from "react";
+ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./lib/supabase";
+import { LANGUAGES, getSavedLanguage, saveLanguage, t } from "./lib/i18n";
 
-// Sirius H&S â€” Modo propietaria
-// En la versiÃ³n actual no existe todavÃ­a un sistema de cuentas/autenticaciÃ³n.
-// Por eso este modo identifica la instalaciÃ³n de la creadora durante las pruebas.
+// Sirius H&S — Modo propietaria
+// En la versión actual no existe todavía un sistema de cuentas/autenticación.
+// Por eso este modo identifica la instalación de la creadora durante las pruebas.
 // Antes de publicar para usuarios reales, OWNER_MODE debe sustituirse por
-// una validaciÃ³n de cuenta en servidor.
+// una validación de cuenta en servidor.
 const OWNER_MODE = true;
 
 function App() {
+const [language, setLanguage] = useState(getSavedLanguage);
+
+  useEffect(() => {
+    saveLanguage(language);
+    document.documentElement.lang = language;
+    document.documentElement.dir =
+      language === "ar" ? "rtl" : "ltr";
+  }, [language]);
   const [activeSection, setActiveSection] = useState("inicio");
   const [showCreateEvent, setShowCreateEvent] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [selectedInvitation, setSelectedInvitation] = useState(null);
 
   // Sirius H&S Premium: estado local de acceso.
-  // IMPORTANTE: la activaciÃ³n real de pago debe validarse en un backend.
+  // IMPORTANTE: la activación real de pago debe validarse en un backend.
   const [premiumEnabled, setPremiumEnabled] = useState(() => {
     if (OWNER_MODE) {
       return true;
@@ -97,7 +106,7 @@ function App() {
     if (OWNER_MODE) {
       setPremiumEnabled(true);
       setPremiumMessage(
-        "ðŸ‘‘ Modo propietaria activo: tu acceso Premium no se puede desactivar."
+        "👑 Modo propietaria activo: tu acceso Premium no se puede desactivar."
       );
       return;
     }
@@ -189,7 +198,7 @@ function App() {
     setActiveSection("eventos");
 
     alert(
-      `Â¡Evento "${newEvent.name}" creado correctamente!`
+      `�?Evento "${newEvent.name}" creado correctamente!`
     );
   };
 
@@ -227,7 +236,7 @@ function App() {
     setShowAddGuest(false);
 
     alert(
-      `Â¡Invitado "${newGuest.name}" agregado correctamente!`
+      `�?Invitado "${newGuest.name}" agregado correctamente!`
     );
   };
 
@@ -277,7 +286,7 @@ function App() {
     const event = getEvent(guest.eventId);
 
     if (!event) {
-      alert("No se encontrÃ³ el evento de este invitado.");
+      alert("No se encontró el evento de este invitado.");
       return;
     }
 
@@ -300,7 +309,7 @@ function App() {
         data.app !== "InvitaQR"
       ) {
         setScanMessage(
-          "âŒ Este QR no pertenece a Sirius H&S."
+          "❌ Este QR no pertenece a Sirius H&S."
         );
         setScanGuest(null);
         return false;
@@ -308,7 +317,7 @@ function App() {
 
       if (!data.guestId || !data.eventId) {
         setScanMessage(
-          "âŒ Este QR no contiene una invitaciÃ³n vÃ¡lida."
+          "❌ Este QR no contiene una invitación v�?lida."
         );
         setScanGuest(null);
         return false;
@@ -320,7 +329,7 @@ function App() {
 
       if (!guest) {
         setScanMessage(
-          "âŒ Invitado no encontrado."
+          "❌ Invitado no encontrado."
         );
         setScanGuest(null);
         return false;
@@ -328,7 +337,7 @@ function App() {
 
       if (guest.qrUsed) {
         setScanMessage(
-          "ðŸ”´ Pase utilizado"
+          "🔴 Pase utilizado"
         );
 
         setScanGuest(guest);
@@ -354,12 +363,12 @@ function App() {
         confirmed: true,
       });
 
-      setScanMessage("âœ… Pase vÃ¡lido");
+      setScanMessage("✅ Pase v�?lido");
 
       return true;
     } catch {
       setScanMessage(
-        "âŒ El QR no es vÃ¡lido."
+        "❌ El QR no es v�?lido."
       );
 
       setScanGuest(null);
@@ -435,7 +444,7 @@ function App() {
 
             if (
               scanMessage ===
-              "ðŸ”´ Pase utilizado"
+              "🔴 Pase utilizado"
             ) {
               stopCamera();
               return;
@@ -443,7 +452,7 @@ function App() {
 
             if (
               scanMessage ===
-              "âŒ Invitado no encontrado."
+              "❌ Invitado no encontrado."
             ) {
               stopCamera();
               return;
@@ -451,7 +460,7 @@ function App() {
 
             if (
               scanMessage ===
-              "âŒ Este QR no pertenece a Sirius H&S."
+              "❌ Este QR no pertenece a Sirius H&S."
             ) {
               stopCamera();
               return;
@@ -459,7 +468,7 @@ function App() {
 
             if (
               scanMessage ===
-              "âŒ Este QR no contiene una invitaciÃ³n vÃ¡lida."
+              "❌ Este QR no contiene una invitación v�?lida."
             ) {
               stopCamera();
               return;
@@ -467,7 +476,7 @@ function App() {
 
             if (
               scanMessage ===
-              "âŒ El QR no es vÃ¡lido."
+              "❌ El QR no es v�?lido."
             ) {
               stopCamera();
               return;
@@ -476,7 +485,7 @@ function App() {
         }
       } else {
         setCameraError(
-          "Tu navegador abriÃ³ la cÃ¡mara, pero no tiene disponible el lector automÃ¡tico de cÃ³digos QR."
+          "Tu navegador abrió la c�?mara, pero no tiene disponible el lector autom�?tico de códigos QR."
         );
 
         return;
@@ -507,7 +516,7 @@ function App() {
         !navigator.mediaDevices.getUserMedia
       ) {
         setCameraError(
-          "Tu navegador no permite acceder a la cÃ¡mara."
+          "Tu navegador no permite acceder a la c�?mara."
         );
 
         return;
@@ -547,7 +556,7 @@ function App() {
       }, 500);
     } catch (error) {
       console.error(
-        "No se pudo abrir la cÃ¡mara:",
+        "No se pudo abrir la c�?mara:",
         error
       );
 
@@ -556,18 +565,18 @@ function App() {
         "NotAllowedError"
       ) {
         setCameraError(
-          "Permiso de cÃ¡mara denegado. Permite el acceso a la cÃ¡mara en tu navegador."
+          "Permiso de c�?mara denegado. Permite el acceso a la c�?mara en tu navegador."
         );
       } else if (
         error.name ===
         "NotFoundError"
       ) {
         setCameraError(
-          "No se encontrÃ³ ninguna cÃ¡mara."
+          "No se encontró ninguna c�?mara."
         );
       } else {
         setCameraError(
-          "No se pudo abrir la cÃ¡mara."
+          "No se pudo abrir la c�?mara."
         );
       }
 
@@ -589,10 +598,10 @@ function App() {
         <header className="topbar">
           <div>
             <p className="welcome">
-              Panel de administraciÃ³n
+              Panel de administración
             </p>
 
-            <h2>Â¡Hola! ðŸ‘‹</h2>
+            <h2>�?Hola! 👋</h2>
           </div>
 
           <button
@@ -608,18 +617,18 @@ function App() {
         <section className="hero">
           <div>
             <span className="hero-label">
-              SIRIUS H&S Â· INVITACIONES INTELIGENTES
+              SIRIUS H&S �? INVITACIONES INTELIGENTES
             </span>
 
             <h2>
-              Haz que cada invitaciÃ³n
+              Haz que cada invitación
               <br />
               sea especial.
             </h2>
 
             <p>
               Crea eventos, administra invitados,
-              genera cÃ³digos QR y controla la
+              genera códigos QR y controla la
               asistencia desde un solo lugar.
             </p>
 
@@ -629,26 +638,26 @@ function App() {
                 setShowCreateEvent(true)
               }
             >
-              Crear mi primer evento â†’
+              Crear mi primer evento →
             </button>
           </div>
 
           <div className="hero-card">
             <div className="qr-placeholder">
               <div className="qr-pattern">
-                <span>â–¦</span>
+                <span>�?�</span>
               </div>
             </div>
 
             <div className="ticket-info">
-              <span>INVITACIÃ“N</span>
+              <span>INVITACIÓN</span>
 
               <strong>
-                Mi prÃ³ximo evento
+                Mi próximo evento
               </strong>
 
               <small>
-                QR Ãºnico para cada invitado
+                QR único para cada invitado
               </small>
             </div>
           </div>
@@ -656,7 +665,7 @@ function App() {
 
         <section className="stats">
           <div className="stat-card">
-            <div className="stat-icon">âœ¦</div>
+            <div className="stat-icon">✦</div>
 
             <div>
               <span>Eventos</span>
@@ -665,7 +674,7 @@ function App() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">â™™</div>
+            <div className="stat-icon">♙</div>
 
             <div>
               <span>Invitados</span>
@@ -674,7 +683,7 @@ function App() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">âœ“</div>
+            <div className="stat-icon">✓</div>
 
             <div>
               <span>Confirmados</span>
@@ -683,7 +692,7 @@ function App() {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">â–£</div>
+            <div className="stat-icon">�?�</div>
 
             <div>
               <span>Pases utilizados</span>
@@ -715,10 +724,10 @@ function App() {
 
           {events.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">âœ¦</div>
+              <div className="empty-icon">✦</div>
 
               <h3>
-                AÃºn no tienes eventos
+                Aún no tienes eventos
               </h3>
 
               <p>
@@ -743,21 +752,21 @@ function App() {
                   key={event.id}
                 >
                   <div className="event-card-icon">
-                    âœ¦
+                    ✦
                   </div>
 
                   <div className="event-card-info">
                     <h3>{event.name}</h3>
 
                     <p>
-                      ðŸ“…{" "}
+                      📅{" "}
                       {formatDate(event.date)}
                       {event.time &&
-                        ` Â· ${event.time}`}
+                        ` �? ${event.time}`}
                     </p>
 
                     <p>
-                      ðŸ“ {event.location}
+                      📍 {event.location}
                     </p>
 
                     <small>
@@ -801,10 +810,10 @@ function App() {
 
         {events.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">âœ¦</div>
+            <div className="empty-icon">✦</div>
 
             <h3>
-              AÃºn no tienes eventos
+              Aún no tienes eventos
             </h3>
 
             <button
@@ -824,21 +833,21 @@ function App() {
                 key={event.id}
               >
                 <div className="event-card-icon">
-                  âœ¦
+                  ✦
                 </div>
 
                 <div className="event-card-info">
                   <h3>{event.name}</h3>
 
                   <p>
-                    ðŸ“…{" "}
+                    📅{" "}
                     {formatDate(event.date)}
                     {event.time &&
-                      ` Â· ${event.time}`}
+                      ` �? ${event.time}`}
                   </p>
 
                   <p>
-                    ðŸ“ {event.location}
+                    📍 {event.location}
                   </p>
 
                   <small>
@@ -928,7 +937,7 @@ function App() {
 
         {!selectedEventId ? (
           <div className="empty-state">
-            <div className="empty-icon">â™™</div>
+            <div className="empty-icon">♙</div>
 
             <h3>
               Selecciona un evento
@@ -941,10 +950,10 @@ function App() {
           </div>
         ) : selectedGuests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">â™™</div>
+            <div className="empty-icon">♙</div>
 
             <h3>
-              AÃºn no hay invitados
+              Aún no hay invitados
             </h3>
 
             <p>
@@ -969,7 +978,7 @@ function App() {
                 key={guest.id}
               >
                 <div className="event-card-icon">
-                  â™™
+                  ♙
                 </div>
 
                 <div className="event-card-info">
@@ -977,15 +986,15 @@ function App() {
 
                   <p>
                     {guest.phone ||
-                      "Sin telÃ©fono"}
+                      "Sin teléfono"}
                   </p>
 
                   <small>
                     {guest.passes} pase(s)
-                    {" Â· "}
+                    {" �? "}
                     {guest.qrUsed
-                      ? "ðŸ”´ Pase utilizado"
-                      : "ðŸŸ¢ Pase disponible"}
+                      ? "🔴 Pase utilizado"
+                      : "🟢 Pase disponible"}
                   </small>
                 </div>
 
@@ -996,7 +1005,7 @@ function App() {
                       openInvitation(guest)
                     }
                   >
-                    Ver invitaciÃ³n
+                    Ver invitación
                   </button>
 
                   <button
@@ -1029,10 +1038,10 @@ function App() {
       <section className="content-section">
         <div className="section-heading">
           <div>
-            <h3>CÃ³digos QR</h3>
+            <h3>Códigos QR</h3>
 
             <p>
-              Cada invitado tiene un QR Ãºnico.
+              Cada invitado tiene un QR único.
             </p>
           </div>
         </div>
@@ -1067,7 +1076,7 @@ function App() {
 
         {selectedGuests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">â–£</div>
+            <div className="empty-icon">�?�</div>
 
             <h3>
               No hay invitados
@@ -1075,7 +1084,7 @@ function App() {
 
             <p>
               Agrega invitados para generar
-              sus cÃ³digos QR.
+              sus códigos QR.
             </p>
           </div>
         ) : (
@@ -1093,7 +1102,7 @@ function App() {
                 </div>
 
                 <div className="qr-card-info">
-                  <span>INVITACIÃ“N</span>
+                  <span>INVITACIÓN</span>
 
                   <h3>{guest.name}</h3>
 
@@ -1111,8 +1120,8 @@ function App() {
 
                   <p>
                     {guest.qrUsed
-                      ? "ðŸ”´ Pase utilizado"
-                      : "ðŸŸ¢ Pase disponible"}
+                      ? "🔴 Pase utilizado"
+                      : "🟢 Pase disponible"}
                   </p>
                 </div>
 
@@ -1134,7 +1143,7 @@ function App() {
                     openInvitation(guest)
                   }
                 >
-                  Ver invitaciÃ³n
+                  Ver invitación
                 </button>
               </div>
             ))}
@@ -1159,12 +1168,12 @@ function App() {
 
         <div className="scanner-box">
           <h3>
-            Escanear cÃ³digo QR
+            Escanear código QR
           </h3>
 
           <p>
-            Apunta la cÃ¡mara al cÃ³digo QR de
-            la invitaciÃ³n.
+            Apunta la c�?mara al código QR de
+            la invitación.
           </p>
 
           <div
@@ -1224,11 +1233,11 @@ function App() {
                     marginBottom: "10px",
                   }}
                 >
-                  ðŸ“·
+                  �?
                 </div>
 
                 <strong>
-                  CÃ¡mara apagada
+                  C�?mara apagada
                 </strong>
 
                 <p
@@ -1237,7 +1246,7 @@ function App() {
                     opacity: 0.8,
                   }}
                 >
-                  Presiona el botÃ³n para
+                  Presiona el botón para
                   comenzar.
                 </p>
               </div>
@@ -1252,7 +1261,7 @@ function App() {
               }}
             >
               <p>
-                âš ï¸ {cameraError}
+                ⚠️ {cameraError}
               </p>
             </div>
           )}
@@ -1268,14 +1277,14 @@ function App() {
                 className="create-button"
                 onClick={startCamera}
               >
-                ðŸ“· Abrir cÃ¡mara
+                �? Abrir c�?mara
               </button>
             ) : (
               <button
                 className="cancel-button"
                 onClick={stopCamera}
               >
-                âœ• Detener cÃ¡mara
+                ✕ Detener c�?mara
               </button>
             )}
           </div>
@@ -1387,7 +1396,7 @@ function App() {
 
         {!selectedEvent ? (
           <div className="empty-state">
-            <div className="empty-icon">âŒ–</div>
+            <div className="empty-icon">�?</div>
 
             <h3>
               Selecciona un evento
@@ -1395,7 +1404,7 @@ function App() {
 
             <p>
               Elige un evento para mostrar
-              su ubicaciÃ³n.
+              su ubicación.
             </p>
           </div>
         ) : (
@@ -1403,7 +1412,7 @@ function App() {
             <h3>{selectedEvent.name}</h3>
 
             <p>
-              ðŸ“ {selectedEvent.location}
+              📍 {selectedEvent.location}
             </p>
 
             <div className="map-container">
@@ -1445,24 +1454,24 @@ function App() {
               SIRIUS H&S
             </span>
 
-            <h3>ConfiguraciÃ³n</h3>
+            <h3>Configuración</h3>
 
             <p>
-              ConfiguraciÃ³n general de tu aplicaciÃ³n.
+              Configuración general de tu aplicación.
             </p>
           </div>
         </div>
 
         <div className="empty-state">
-          <div className="empty-icon">âš™</div>
+          <div className="empty-icon">⚙</div>
 
           <h3>
-            ConfiguraciÃ³n
+            Configuración
           </h3>
 
           <p>
-            PrÃ³ximamente podrÃ¡s personalizar
-            mÃ¡s opciones de Sirius H&S.
+            Próximamente podr�?s personalizar
+            m�?s opciones de Sirius H&S.
           </p>
         </div>
       </section>
@@ -1472,11 +1481,11 @@ function App() {
   const renderPremium = () => {
     const premiumFeatures = [
       "Invitaciones premium",
-      "DiseÃ±os exclusivos",
-      "PersonalizaciÃ³n avanzada",
+      "Diseños exclusivos",
+      "Personalización avanzada",
       "Mapas estilizados",
       "Animaciones avanzadas",
-      "MÃºsica y voz",
+      "Música y voz",
       "Avatares",
       "Herramientas de referencia visual",
     ];
@@ -1494,18 +1503,18 @@ function App() {
         </div>
 
         <div className="premium-hero">
-          <div className="premium-crown">â™›</div>
+          <div className="premium-crown">♛</div>
           <div>
             <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
             <h2>
               {premiumEnabled
-                ? "Premium estÃ¡ activo"
+                ? "Premium est�? activo"
                 : "Lleva tus invitaciones al siguiente nivel"}
             </h2>
             <p>
               {premiumEnabled
-                ? "Las funciones Premium estÃ¡n habilitadas en este dispositivo."
-                : "DiseÃ±os, mapas, animaciones y herramientas creativas avanzadas."}
+                ? "Las funciones Premium est�?n habilitadas en este dispositivo."
+                : "Diseños, mapas, animaciones y herramientas creativas avanzadas."}
             </p>
           </div>
         </div>
@@ -1529,13 +1538,13 @@ function App() {
             </div>
             <p>Todo lo necesario para comenzar a crear tus eventos.</p>
             <ul>
-              <li>âœ“ Crear eventos</li>
-              <li>âœ“ Administrar invitados</li>
-              <li>âœ“ 1 pase por invitado</li>
-              <li>âœ“ CÃ³digos QR</li>
-              <li>âœ“ ConfirmaciÃ³n con cÃ¡mara</li>
-              <li>âœ“ Mapa del evento</li>
-              <li>âœ“ InvitaciÃ³n digital</li>
+              <li>✓ Crear eventos</li>
+              <li>✓ Administrar invitados</li>
+              <li>✓ 1 pase por invitado</li>
+              <li>✓ Códigos QR</li>
+              <li>✓ Confirmación con c�?mara</li>
+              <li>✓ Mapa del evento</li>
+              <li>✓ Invitación digital</li>
             </ul>
             <button className="outline-button" disabled>
               {premiumEnabled ? "Plan disponible" : "Plan actual"}
@@ -1543,18 +1552,18 @@ function App() {
           </div>
 
           <div className="premium-card premium-plan">
-            <div className="crown-realistic">â™›</div>
+            <div className="crown-realistic">♛</div>
             <span className="plan-badge premium-badge">PREMIUM</span>
             <h3>Sirius H&S Premium</h3>
             <div className="plan-price">
               {premiumEnabled ? "ACTIVO" : "Acceso Premium"}
             </div>
             <p>
-              Desbloquea una experiencia mÃ¡s exclusiva para tus eventos.
+              Desbloquea una experiencia m�?s exclusiva para tus eventos.
             </p>
             <ul>
               {premiumFeatures.map((feature) => (
-                <li key={feature}>âœ“ {feature}</li>
+                <li key={feature}>✓ {feature}</li>
               ))}
             </ul>
 
@@ -1564,14 +1573,14 @@ function App() {
                 type="button"
                 disabled
               >
-                ðŸ‘‘ Premium de propietaria â€” ACTIVO
+                👑 Premium de propietaria — ACTIVO
               </button>
             ) : !premiumEnabled ? (
               <button
                 className="create-button premium-button"
                 onClick={activatePremiumDemo}
               >
-                â™› Activar Premium (prueba)
+                ♛ Activar Premium (prueba)
               </button>
             ) : (
               <button
@@ -1585,11 +1594,11 @@ function App() {
         </div>
 
         <div className="premium-note">
-          <strong>â™› Sirius H&S</strong>
+          <strong>♛ Sirius H&S</strong>
           <p>
-            El acceso Premium se guarda localmente para esta instalaciÃ³n.
-            La activaciÃ³n de pago real todavÃ­a requiere un servidor y una
-            pasarela de pagos; nunca debe confiarse Ãºnicamente en localStorage.
+            El acceso Premium se guarda localmente para esta instalación.
+            La activación de pago real todavía requiere un servidor y una
+            pasarela de pagos; nunca debe confiarse únicamente en localStorage.
           </p>
         </div>
 
@@ -1598,7 +1607,7 @@ function App() {
           <h3>{premiumEnabled ? "Premium habilitado" : "Plan Gratis activo"}</h3>
           <p>
             {premiumEnabled
-              ? "Ya puedes conectar aquÃ­ las herramientas avanzadas de Sirius H&S."
+              ? "Ya puedes conectar aquí las herramientas avanzadas de Sirius H&S."
               : "Las funciones gratuitas siguen funcionando normalmente. Las funciones Premium pueden protegerse mediante requirePremium()."}
           </p>
           {!premiumEnabled && (
@@ -1606,7 +1615,7 @@ function App() {
               className="outline-button"
               onClick={() => requirePremium()}
             >
-              Probar protecciÃ³n Premium
+              Probar protección Premium
             </button>
           )}
         </div>
@@ -1622,7 +1631,22 @@ function App() {
         <div className="brand">
 
           <div className="brand-icon">
-            â™›
+            ♛
+
+        <div className="language-selector">
+          <span className="language-label">?? Idioma</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            aria-label="Seleccionar idioma"
+          >
+            {LANGUAGES.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.flag} {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
           </div>
 
           <div>
@@ -1649,7 +1673,7 @@ function App() {
               changeSection("inicio")
             }
           >
-            <span>âŒ‚</span>
+            <span>⌂</span>
             Inicio
           </button>
 
@@ -1663,7 +1687,7 @@ function App() {
               changeSection("eventos")
             }
           >
-            <span>âœ¦</span>
+            <span>✦</span>
             Mis eventos
           </button>
 
@@ -1677,7 +1701,7 @@ function App() {
               changeSection("invitados")
             }
           >
-            <span>â™™</span>
+            <span>♙</span>
             Invitados
           </button>
 
@@ -1691,8 +1715,8 @@ function App() {
               changeSection("qr")
             }
           >
-            <span>â–£</span>
-            CÃ³digos QR
+            <span>�?�</span>
+            Códigos QR
           </button>
 
           <button
@@ -1705,7 +1729,7 @@ function App() {
               changeSection("confirmaciones")
             }
           >
-            <span>âœ“</span>
+            <span>✓</span>
             Confirmaciones
           </button>
 
@@ -1719,7 +1743,7 @@ function App() {
               changeSection("mapa")
             }
           >
-            <span>âŒ–</span>
+            <span>�?</span>
             Mapa
           </button>
 
@@ -1733,8 +1757,8 @@ function App() {
               changeSection("configuracion")
             }
           >
-            <span>âš™</span>
-            ConfiguraciÃ³n
+            <span>⚙</span>
+            Configuración
           </button>
 
           <button
@@ -1747,7 +1771,7 @@ function App() {
               changeSection("premium")
             }
           >
-            <span>â™›</span>
+            <span>♛</span>
             Desbloqueos Premium
           </button>
 
@@ -1758,7 +1782,7 @@ function App() {
           <div className="help-box">
 
             <strong>
-              Â¿Necesitas ayuda?
+              �?Necesitas ayuda?
             </strong>
 
             <p>
@@ -1766,7 +1790,7 @@ function App() {
             </p>
 
             <button>
-              Ver guÃ­a
+              Ver guía
             </button>
 
           </div>
@@ -1846,7 +1870,7 @@ function App() {
                   setShowCreateEvent(false)
                 }
               >
-                Ã—
+                �?
               </button>
 
             </div>
@@ -1862,7 +1886,7 @@ function App() {
                 <input
                   type="text"
                   name="name"
-                  placeholder="Ej. Boda de MarÃ­a y Juan"
+                  placeholder="Ej. Boda de María y Juan"
                   value={eventData.name}
                   onChange={handleEventChange}
                 />
@@ -1912,7 +1936,7 @@ function App() {
                 <input
                   type="text"
                   name="location"
-                  placeholder="Ej. ZÃ³calo de Veracruz"
+                  placeholder="Ej. Zócalo de Veracruz"
                   value={eventData.location}
                   onChange={handleEventChange}
                 />
@@ -2008,7 +2032,7 @@ function App() {
                   setShowAddGuest(false)
                 }
               >
-                Ã—
+                �?
               </button>
 
             </div>
@@ -2024,7 +2048,7 @@ function App() {
                 <input
                   type="text"
                   name="name"
-                  placeholder="Ej. MarÃ­a LÃ³pez"
+                  placeholder="Ej. María López"
                   value={guestData.name}
                   onChange={handleGuestChange}
                 />
@@ -2034,7 +2058,7 @@ function App() {
               <div className="form-group">
 
                 <label>
-                  TelÃ©fono
+                  Teléfono
                 </label>
 
                 <input
@@ -2128,7 +2152,7 @@ function App() {
               <div>
 
                 <span className="hero-label">
-                  INVITACIÃ“N DIGITAL
+                  INVITACIÓN DIGITAL
                 </span>
 
                 <h2>
@@ -2141,7 +2165,7 @@ function App() {
                 className="close-button"
                 onClick={closeInvitation}
               >
-                Ã—
+                �?
               </button>
 
             </div>
@@ -2167,7 +2191,7 @@ function App() {
               </h1>
 
               <p>
-                ðŸŽŸï¸{" "}
+                🎟️{" "}
                 <strong>
                   {selectedInvitation.guest.passes}
                 </strong>{" "}
@@ -2197,7 +2221,7 @@ function App() {
               </div>
 
               <p>
-                ðŸ”³ Presenta este cÃ³digo QR
+                🔳 Presenta este código QR
                 al ingresar al evento.
               </p>
 
@@ -2215,7 +2239,7 @@ function App() {
               <div className="stat-card">
 
                 <span>
-                  ðŸ“… Fecha
+                  📅 Fecha
                 </span>
 
                 <strong>
@@ -2229,7 +2253,7 @@ function App() {
               <div className="stat-card">
 
                 <span>
-                  ðŸ• Hora
+                  🕐 Hora
                 </span>
 
                 <strong>
@@ -2242,7 +2266,7 @@ function App() {
               <div className="stat-card">
 
                 <span>
-                  ðŸ“ Lugar
+                  📍 Lugar
                 </span>
 
                 <strong>
@@ -2256,7 +2280,7 @@ function App() {
             <div className="map-card">
 
               <h3>
-                ðŸ“ UbicaciÃ³n del evento
+                📍 Ubicación del evento
               </h3>
 
               <p>
@@ -2293,7 +2317,7 @@ function App() {
                   marginTop: "15px",
                 }}
               >
-                ðŸ—ºï¸ CÃ³mo llegar
+                �?�️ Cómo llegar
               </a>
 
             </div>
@@ -2335,4 +2359,20 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
