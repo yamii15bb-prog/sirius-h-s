@@ -2,7 +2,12 @@
 import "./App.css";
 import { supabase } from "./lib/supabase";
 import { LANGUAGES, getSavedLanguage, saveLanguage, t } from "./lib/i18n";
-
+import {
+  getCurrentUser,
+  getProfile,
+  createProfile,
+  getPremiumStatus,
+} from "./lib/siriusApi";
 // Sirius H&S — Modo propietaria
 // En la versión actual no existe todavía un sistema de cuentas/autenticación.
 // Por eso este modo identifica la instalación de la creadora durante las pruebas.
@@ -35,7 +40,15 @@ const [language, setLanguage] = useState(getSavedLanguage);
   });
 
   const [premiumMessage, setPremiumMessage] = useState("");
+// =========================================================
+// CUENTA Y PERFIL SUPABASE
+// =========================================================
 
+const [currentUser, setCurrentUser] = useState(null);
+const [userProfile, setUserProfile] = useState(null);
+const [accountLoading, setAccountLoading] = useState(true);
+const [accountError, setAccountError] = useState("");
+const [supabasePremium, setSupabasePremium] = useState(false);
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem("siriusHS_events");
     return saved ? JSON.parse(saved) : [];
@@ -198,7 +211,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
     setActiveSection("eventos");
 
     alert(
-      `�?Evento "${newEvent.name}" creado correctamente!`
+      `📅 Evento "${newEvent.name}" creado correctamente!`
     );
   };
 
@@ -236,7 +249,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
     setShowAddGuest(false);
 
     alert(
-      `�?Invitado "${newGuest.name}" agregado correctamente!`
+      `👤 Invitado "${newGuest.name}" agregado correctamente!`
     );
   };
 
@@ -317,7 +330,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
       if (!data.guestId || !data.eventId) {
         setScanMessage(
-          "❌ Este QR no contiene una invitación v�?lida."
+          "❌ Este QR no contiene una invitación válida."
         );
         setScanGuest(null);
         return false;
@@ -334,23 +347,51 @@ const [language, setLanguage] = useState(getSavedLanguage);
         setScanGuest(null);
         return false;
       }
+      const totalPasses = Math.max(
+        1,
+        Number(guest.passes || 1)
+      );
 
-      if (guest.qrUsed) {
+      const alreadyUsed = Math.max(
+        0,
+        Number(guest.passesUsed || 0)
+      );
+
+      const remainingPasses =
+        totalPasses - alreadyUsed;
+
+      if (remainingPasses <= 0) {
+
         setScanMessage(
-          "🔴 Pase utilizado"
+          "🔴 Todos los pases de este invitado ya fueron utilizados."
         );
 
-        setScanGuest(guest);
+        setScanGuest({
+          ...guest,
+          passesUsed: totalPasses,
+          qrUsed: true,
+          confirmed: true,
+        });
 
-        return false;
+        return;
       }
+
+      const newPassesUsed =
+        alreadyUsed + 1;
+
+      const newRemainingPasses =
+        totalPasses - newPassesUsed;
+
+      const qrNowUsed =
+        newPassesUsed >= totalPasses;
 
       setGuests((old) =>
         old.map((item) =>
           item.id === guest.id
             ? {
                 ...item,
-                qrUsed: true,
+                passesUsed: newPassesUsed,
+                qrUsed: qrNowUsed,
                 confirmed: true,
               }
             : item
@@ -359,16 +400,28 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
       setScanGuest({
         ...guest,
-        qrUsed: true,
+        passesUsed: newPassesUsed,
+        qrUsed: qrNowUsed,
         confirmed: true,
       });
 
-      setScanMessage("✅ Pase v�?lido");
+      if (newRemainingPasses > 0) {
 
-      return true;
+        setScanMessage(
+          `✅ Pase válido. Quedan ${newRemainingPasses} pase(s) disponibles.`
+        );
+
+      } else {
+
+        setScanMessage(
+          "✅ Último pase utilizado. Invitación agotada."
+        );
+
+      }
+return true;
     } catch {
       setScanMessage(
-        "❌ El QR no es v�?lido."
+        "❌ El QR no es válido."
       );
 
       setScanGuest(null);
@@ -468,7 +521,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
             if (
               scanMessage ===
-              "❌ Este QR no contiene una invitación v�?lida."
+              "❌ Este QR no contiene una invitación válida."
             ) {
               stopCamera();
               return;
@@ -476,7 +529,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
             if (
               scanMessage ===
-              "❌ El QR no es v�?lido."
+              "❌ El QR no es válido."
             ) {
               stopCamera();
               return;
@@ -485,7 +538,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
         }
       } else {
         setCameraError(
-          "Tu navegador abrió la c�?mara, pero no tiene disponible el lector autom�?tico de códigos QR."
+          "Tu navegador abrió la cámara, pero no tiene disponible el lector automático de códigos QR."
         );
 
         return;
@@ -516,7 +569,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
         !navigator.mediaDevices.getUserMedia
       ) {
         setCameraError(
-          "Tu navegador no permite acceder a la c�?mara."
+          "Tu navegador no permite acceder a la cámara."
         );
 
         return;
@@ -556,7 +609,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
       }, 500);
     } catch (error) {
       console.error(
-        "No se pudo abrir la c�?mara:",
+        "No se pudo abrir la cámara:",
         error
       );
 
@@ -565,18 +618,18 @@ const [language, setLanguage] = useState(getSavedLanguage);
         "NotAllowedError"
       ) {
         setCameraError(
-          "Permiso de c�?mara denegado. Permite el acceso a la c�?mara en tu navegador."
+          "Permiso de cámara denegado. Permite el acceso a la cámara en tu navegador."
         );
       } else if (
         error.name ===
         "NotFoundError"
       ) {
         setCameraError(
-          "No se encontró ninguna c�?mara."
+          "No se encontró ninguna cámara."
         );
       } else {
         setCameraError(
-          "No se pudo abrir la c�?mara."
+          "No se pudo abrir la cámara."
         );
       }
 
@@ -601,7 +654,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
               Panel de administración
             </p>
 
-            <h2>�?Hola! 👋</h2>
+            <h2>📷Hola! 👋</h2>
           </div>
 
           <button
@@ -617,7 +670,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
         <section className="hero">
           <div>
             <span className="hero-label">
-              SIRIUS H&S �? INVITACIONES INTELIGENTES
+              SIRIUS H&S 📷 INVITACIONES INTELIGENTES
             </span>
 
             <h2>
@@ -645,7 +698,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
           <div className="hero-card">
             <div className="qr-placeholder">
               <div className="qr-pattern">
-                <span>�?�</span>
+                <span>📍</span>
               </div>
             </div>
 
@@ -692,7 +745,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon">�?�</div>
+            <div className="stat-icon">📍</div>
 
             <div>
               <span>Pases utilizados</span>
@@ -762,7 +815,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                       📅{" "}
                       {formatDate(event.date)}
                       {event.time &&
-                        ` �? ${event.time}`}
+                        ` 📷 ${event.time}`}
                     </p>
 
                     <p>
@@ -843,7 +896,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                     📅{" "}
                     {formatDate(event.date)}
                     {event.time &&
-                      ` �? ${event.time}`}
+                      ` 📷 ${event.time}`}
                   </p>
 
                   <p>
@@ -990,8 +1043,21 @@ const [language, setLanguage] = useState(getSavedLanguage);
                   </p>
 
                   <small>
-                    {guest.passes} pase(s)
-                    {" �? "}
+                    <div className="guest-passes-info">
+  <div>
+    🎟️ <strong>Pases asignados:</strong>{" "}
+    {Math.max(1, Number(guest.passes || 1))}
+  </div>
+  <div>
+    🟢 <strong>Pases disponibles:</strong>{" "}
+    {Math.max(
+      0,
+      Number(guest.passes || 1) -
+        Number(guest.passesUsed || 0)
+    )}
+  </div>
+</div>
+                    {" 📷 "}
                     {guest.qrUsed
                       ? "🔴 Pase utilizado"
                       : "🟢 Pase disponible"}
@@ -1076,7 +1142,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
         {selectedGuests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">�?�</div>
+            <div className="empty-icon">📍</div>
 
             <h3>
               No hay invitados
@@ -1115,7 +1181,20 @@ const [language, setLanguage] = useState(getSavedLanguage);
                   </p>
 
                   <small>
-                    {guest.passes} pase(s)
+                    <div className="guest-passes-info">
+  <div>
+    🎟️ <strong>Pases asignados:</strong>{" "}
+    {Math.max(1, Number(guest.passes || 1))}
+  </div>
+  <div>
+    🟢 <strong>Pases disponibles:</strong>{" "}
+    {Math.max(
+      0,
+      Number(guest.passes || 1) -
+        Number(guest.passesUsed || 0)
+    )}
+  </div>
+</div>
                   </small>
 
                   <p>
@@ -1172,7 +1251,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
           </h3>
 
           <p>
-            Apunta la c�?mara al código QR de
+            Apunta la cámara al código QR de
             la invitación.
           </p>
 
@@ -1233,11 +1312,11 @@ const [language, setLanguage] = useState(getSavedLanguage);
                     marginBottom: "10px",
                   }}
                 >
-                  �?
+                  📷
                 </div>
 
                 <strong>
-                  C�?mara apagada
+                  Cámara apagada
                 </strong>
 
                 <p
@@ -1277,14 +1356,14 @@ const [language, setLanguage] = useState(getSavedLanguage);
                 className="create-button"
                 onClick={startCamera}
               >
-                �? Abrir c�?mara
+                📷 Abrir cámara
               </button>
             ) : (
               <button
                 className="cancel-button"
                 onClick={stopCamera}
               >
-                ✕ Detener c�?mara
+                ✕ Detener cámara
               </button>
             )}
           </div>
@@ -1316,7 +1395,20 @@ const [language, setLanguage] = useState(getSavedLanguage);
                 <p>
                   Pases:{" "}
                   <strong>
-                    {scanGuest.passes}
+                    <div className="scan-passes-info">
+  <div>
+    🎟️ <strong>Pases asignados:</strong>{" "}
+    {Math.max(1, Number(scanGuest.passes || 1))}
+  </div>
+  <div>
+    🟢 <strong>Pases disponibles:</strong>{" "}
+    {Math.max(
+      0,
+      Number(scanGuest.passes || 1) -
+        Number(scanGuest.passesUsed || 0)
+    )}
+  </div>
+</div>
                   </strong>
                 </p>
 
@@ -1396,7 +1488,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
 
         {!selectedEvent ? (
           <div className="empty-state">
-            <div className="empty-icon">�?</div>
+            <div className="empty-icon">📷</div>
 
             <h3>
               Selecciona un evento
@@ -1470,8 +1562,8 @@ const [language, setLanguage] = useState(getSavedLanguage);
           </h3>
 
           <p>
-            Próximamente podr�?s personalizar
-            m�?s opciones de Sirius H&S.
+            Próximamente podrás personalizar
+            más opciones de Sirius H&S.
           </p>
         </div>
       </section>
@@ -1508,12 +1600,12 @@ const [language, setLanguage] = useState(getSavedLanguage);
             <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
             <h2>
               {premiumEnabled
-                ? "Premium est�? activo"
+                ? "Premium está activo"
                 : "Lleva tus invitaciones al siguiente nivel"}
             </h2>
             <p>
               {premiumEnabled
-                ? "Las funciones Premium est�?n habilitadas en este dispositivo."
+                ? "Las funciones Premium están habilitadas en este dispositivo."
                 : "Diseños, mapas, animaciones y herramientas creativas avanzadas."}
             </p>
           </div>
@@ -1542,7 +1634,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
               <li>✓ Administrar invitados</li>
               <li>✓ 1 pase por invitado</li>
               <li>✓ Códigos QR</li>
-              <li>✓ Confirmación con c�?mara</li>
+              <li>✓ Confirmación con cámara</li>
               <li>✓ Mapa del evento</li>
               <li>✓ Invitación digital</li>
             </ul>
@@ -1559,7 +1651,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
               {premiumEnabled ? "ACTIVO" : "Acceso Premium"}
             </div>
             <p>
-              Desbloquea una experiencia m�?s exclusiva para tus eventos.
+              Desbloquea una experiencia más exclusiva para tus eventos.
             </p>
             <ul>
               {premiumFeatures.map((feature) => (
@@ -1715,7 +1807,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
               changeSection("qr")
             }
           >
-            <span>�?�</span>
+            <span>📍</span>
             Códigos QR
           </button>
 
@@ -1743,7 +1835,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
               changeSection("mapa")
             }
           >
-            <span>�?</span>
+            <span>📷</span>
             Mapa
           </button>
 
@@ -1782,7 +1874,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
           <div className="help-box">
 
             <strong>
-              �?Necesitas ayuda?
+              📷Necesitas ayuda?
             </strong>
 
             <p>
@@ -1870,7 +1962,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                   setShowCreateEvent(false)
                 }
               >
-                �?
+                📷
               </button>
 
             </div>
@@ -2032,7 +2124,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                   setShowAddGuest(false)
                 }
               >
-                �?
+                📷
               </button>
 
             </div>
@@ -2165,7 +2257,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                 className="close-button"
                 onClick={closeInvitation}
               >
-                �?
+                📷
               </button>
 
             </div>
@@ -2317,7 +2409,7 @@ const [language, setLanguage] = useState(getSavedLanguage);
                   marginTop: "15px",
                 }}
               >
-                �?�️ Cómo llegar
+                🗺️ Cómo llegar
               </a>
 
             </div>
