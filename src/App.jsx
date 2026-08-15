@@ -1,7 +1,11 @@
- import { useEffect, useRef, useState } from "react";
+﻿ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./lib/supabase";
 import { LANGUAGES, getSavedLanguage, saveLanguage, t } from "./lib/i18n";
+import { detectSiriusCommand, executeSiriusCommand } from "./lib/siriusCommands";
+import { createSiriusState } from "./lib/siriusState";
+import { PremiumStudio } from './premium';
+import SiriusAssistant from "./ai/SiriusAssistant";
 import {
   getCurrentUser,
   getProfile,
@@ -101,12 +105,12 @@ const [supabasePremium, setSupabasePremium] = useState(false);
   useEffect(() => {
     localStorage.setItem("siriusHS_premium", String(premiumEnabled));
   }, [premiumEnabled]);
-
   useEffect(() => {
     return () => {
       stopCamera();
     };
   }, []);
+
 
   const activatePremiumDemo = () => {
     setPremiumEnabled(true);
@@ -1570,151 +1574,26 @@ return true;
     );
   };
 
+
   const renderPremium = () => {
-    const premiumFeatures = [
-      "Invitaciones premium",
-      "Diseños exclusivos",
-      "Personalización avanzada",
-      "Mapas estilizados",
-      "Animaciones avanzadas",
-      "Música y voz",
-      "Avatares",
-      "Herramientas de referencia visual",
-    ];
+    const selectedEvent = selectedEventId
+      ? events.find((item) => item.id === selectedEventId)
+      : null;
+
+    if (!premiumEnabled && !OWNER_MODE) {
+      setPremiumMessage(
+        "Esta herramienta pertenece a Sirius H&S Premium. Activa Premium para continuar."
+      );
+      return null;
+    }
 
     return (
-      <section className="content-section">
-        <div className="section-heading">
-          <div>
-            <span className="hero-label">SIRIUS H&S</span>
-            <h3>Desbloqueos Premium</h3>
-            <p>
-              Administra el acceso a las funciones avanzadas de Sirius H&S.
-            </p>
-          </div>
-        </div>
-
-        <div className="premium-hero">
-          <div className="premium-crown">♛</div>
-          <div>
-            <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
-            <h2>
-              {premiumEnabled
-                ? "Premium está activo"
-                : "Lleva tus invitaciones al siguiente nivel"}
-            </h2>
-            <p>
-              {premiumEnabled
-                ? "Las funciones Premium están habilitadas en este dispositivo."
-                : "Diseños, mapas, animaciones y herramientas creativas avanzadas."}
-            </p>
-          </div>
-        </div>
-
-        {premiumMessage && (
-          <div
-            className="stat-card"
-            style={{ marginTop: "18px" }}
-            role="status"
-          >
-            {premiumMessage}
-          </div>
-        )}
-
-        <div className="premium-plans">
-          <div className="premium-card free-plan">
-            <span className="plan-badge">GRATIS</span>
-            <h3>Plan Gratis</h3>
-            <div className="plan-price">
-              $0 <small>MXN</small>
-            </div>
-            <p>Todo lo necesario para comenzar a crear tus eventos.</p>
-            <ul>
-              <li>✓ Crear eventos</li>
-              <li>✓ Administrar invitados</li>
-              <li>✓ 1 pase por invitado</li>
-              <li>✓ Códigos QR</li>
-              <li>✓ Confirmación con cámara</li>
-              <li>✓ Mapa del evento</li>
-              <li>✓ Invitación digital</li>
-            </ul>
-            <button className="outline-button" disabled>
-              {premiumEnabled ? "Plan disponible" : "Plan actual"}
-            </button>
-          </div>
-
-          <div className="premium-card premium-plan">
-            <div className="crown-realistic">♛</div>
-            <span className="plan-badge premium-badge">PREMIUM</span>
-            <h3>Sirius H&S Premium</h3>
-            <div className="plan-price">
-              {premiumEnabled ? "ACTIVO" : "Acceso Premium"}
-            </div>
-            <p>
-              Desbloquea una experiencia más exclusiva para tus eventos.
-            </p>
-            <ul>
-              {premiumFeatures.map((feature) => (
-                <li key={feature}>✓ {feature}</li>
-              ))}
-            </ul>
-
-            {OWNER_MODE ? (
-              <button
-                className="create-button premium-button"
-                type="button"
-                disabled
-              >
-                👑 Premium de propietaria — ACTIVO
-              </button>
-            ) : !premiumEnabled ? (
-              <button
-                className="create-button premium-button"
-                onClick={activatePremiumDemo}
-              >
-                ♛ Activar Premium (prueba)
-              </button>
-            ) : (
-              <button
-                className="outline-button"
-                onClick={deactivatePremium}
-              >
-                Desactivar en este dispositivo
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="premium-note">
-          <strong>♛ Sirius H&S</strong>
-          <p>
-            El acceso Premium se guarda localmente para esta instalación.
-            La activación de pago real todavía requiere un servidor y una
-            pasarela de pagos; nunca debe confiarse únicamente en localStorage.
-          </p>
-        </div>
-
-        <div className="premium-card" style={{ marginTop: "20px" }}>
-          <span className="plan-badge">ESTADO DEL SISTEMA</span>
-          <h3>{premiumEnabled ? "Premium habilitado" : "Plan Gratis activo"}</h3>
-          <p>
-            {premiumEnabled
-              ? "Ya puedes conectar aquí las herramientas avanzadas de Sirius H&S."
-              : "Las funciones gratuitas siguen funcionando normalmente. Las funciones Premium pueden protegerse mediante requirePremium()."}
-          </p>
-          {!premiumEnabled && (
-            <button
-              className="outline-button"
-              onClick={() => requirePremium()}
-            >
-              Probar protección Premium
-            </button>
-          )}
-        </div>
-      </section>
+      <PremiumStudio
+        event={selectedEvent}
+        onClose={() => setActiveSection("inicio")}
+      />
     );
   };
-
   return (
     <div className="app">
 
@@ -1866,7 +1745,19 @@ return true;
             <span>♛</span>
             Desbloqueos Premium
           </button>
-
+          <button
+            className={`nav-item sirius-ai-nav-item ${
+              activeSection === "assistant"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("assistant")
+            }
+          >
+            <span>✧</span>
+            Sirius AI
+          </button>
         </nav>
 
         <div className="sidebar-bottom">
@@ -1909,7 +1800,7 @@ return true;
 
       </aside>
 
-      <main className="main">
+<main className="main">
 
         {activeSection === "inicio" &&
           renderInicio()}
@@ -1934,6 +1825,44 @@ return true;
 
         {activeSection === "premium" &&
           renderPremium()}
+
+        {activeSection === "assistant" && (
+          <SiriusAssistant
+            project={
+              selectedEventId
+                ? events.find(
+                    (item) => item.id === selectedEventId
+                  )
+                : null
+            }
+            onApplySuggestion={(projectUpdate) => {
+              console.log("Sirius AI → proyecto:", projectUpdate);
+
+              if (!projectUpdate) return;
+
+              setEventData((previous) => ({
+                ...previous,
+                ...(projectUpdate.name !== undefined
+                  ? { name: projectUpdate.name }
+                  : {}),
+                ...(projectUpdate.date !== undefined
+                  ? { date: projectUpdate.date }
+                  : {}),
+                ...(projectUpdate.time !== undefined
+                  ? { time: projectUpdate.time }
+                  : {}),
+                ...(projectUpdate.location !== undefined
+                  ? { location: projectUpdate.location }
+                  : {}),
+                ...(projectUpdate.passes !== undefined
+                  ? { passes: Number(projectUpdate.passes) || 1 }
+                  : {}),
+              }));
+
+              setShowCreateEvent(true);
+            }}
+          />
+        )}
 
       </main>
 
@@ -2451,6 +2380,22 @@ return true;
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

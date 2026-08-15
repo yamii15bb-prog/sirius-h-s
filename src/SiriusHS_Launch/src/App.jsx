@@ -1,13 +1,54 @@
-import { useEffect, useRef, useState } from "react";
+  import { useEffect, useRef, useState } from "react";
 import "./App.css";
+import { supabase } from "./lib/supabase";
+import { LANGUAGES, getSavedLanguage, saveLanguage, t } from "./lib/i18n";
+import {
+  getCurrentUser,
+  getProfile,
+  createProfile,
+  getPremiumStatus,
+} from "./lib/siriusApi";
+// Sirius H&S â€” Modo propietaria
+// En la versiÃ³n actual no existe todavÃ­a un sistema de cuentas/autenticaciÃ³n.
+// Por eso este modo identifica la instalaciÃ³n de la creadora durante las pruebas.
+// Antes de publicar para usuarios reales, OWNER_MODE debe sustituirse por
+// una validaciÃ³n de cuenta en servidor.
+const OWNER_MODE = true;
 
 function App() {
+const [language, setLanguage] = useState(getSavedLanguage);
+
+  useEffect(() => {
+    saveLanguage(language);
+    document.documentElement.lang = language;
+    document.documentElement.dir =
+      language === "ar" ? "rtl" : "ltr";
+  }, [language]);
   const [activeSection, setActiveSection] = useState("inicio");
   const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [editingEventId, setEditingEventId] = useState(null);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [selectedInvitation, setSelectedInvitation] = useState(null);
 
+  // Sirius H&S Premium: estado local de acceso.
+  // IMPORTANTE: la activaciÃ³n real de pago debe validarse en un backend.
+  const [premiumEnabled, setPremiumEnabled] = useState(() => {
+    if (OWNER_MODE) {
+      return true;
+    }
+
+    return localStorage.getItem("siriusHS_premium") === "true";
+  });
+
+  const [premiumMessage, setPremiumMessage] = useState("");
+// =========================================================
+// CUENTA Y PERFIL SUPABASE
+// =========================================================
+
+const [currentUser, setCurrentUser] = useState(null);
+const [userProfile, setUserProfile] = useState(null);
+const [accountLoading, setAccountLoading] = useState(true);
+const [accountError, setAccountError] = useState("");
+const [supabasePremium, setSupabasePremium] = useState(false);
   const [events, setEvents] = useState(() => {
     const saved = localStorage.getItem("siriusHS_events");
     return saved ? JSON.parse(saved) : [];
@@ -19,26 +60,6 @@ function App() {
   });
 
   const [selectedEventId, setSelectedEventId] = useState("");
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState("");
-  const [scanMessage, setScanMessage] = useState("");
-  const [scanGuest, setScanGuest] = useState(null);
-
-  const [editorData, setEditorData] = useState(() => {
-    const saved = localStorage.getItem("siriusHS_editor");
-    return saved
-      ? JSON.parse(saved)
-      : {
-          title: "Nuestra celebración",
-          subtitle: "Tenemos el gusto de invitarte",
-          message: "Será un honor compartir este momento contigo.",
-          theme: "elegante",
-          animation: "suave",
-          music: false,
-          map: true,
-          qr: true,
-        };
-  });
 
   const [eventData, setEventData] = useState({
     name: "",
@@ -54,28 +75,76 @@ function App() {
     passes: 1,
   });
 
+  const [scanMessage, setScanMessage] = useState("");
+  const [scanGuest, setScanGuest] = useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const scanTimerRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem("siriusHS_events", JSON.stringify(events));
+    localStorage.setItem(
+      "siriusHS_events",
+      JSON.stringify(events)
+    );
   }, [events]);
 
   useEffect(() => {
-    localStorage.setItem("siriusHS_guests", JSON.stringify(guests));
+    localStorage.setItem(
+      "siriusHS_guests",
+      JSON.stringify(guests)
+    );
   }, [guests]);
 
   useEffect(() => {
-    localStorage.setItem("siriusHS_editor", JSON.stringify(editorData));
-  }, [editorData]);
+    localStorage.setItem("siriusHS_premium", String(premiumEnabled));
+  }, [premiumEnabled]);
 
   useEffect(() => {
-    return () => stopCamera();
+    return () => {
+      stopCamera();
+    };
   }, []);
 
+  const activatePremiumDemo = () => {
+    setPremiumEnabled(true);
+    setPremiumMessage(
+      "Premium activado en este dispositivo. Para cobrar pagos reales, conecta una pasarela y valida el pago en un servidor."
+    );
+  };
+
+  const deactivatePremium = () => {
+    if (OWNER_MODE) {
+      setPremiumEnabled(true);
+      setPremiumMessage(
+        "ðŸ‘‘ Modo propietaria activo: tu acceso Premium no se puede desactivar."
+      );
+      return;
+    }
+
+    setPremiumEnabled(false);
+    setPremiumMessage("Premium desactivado en este dispositivo.");
+  };
+
+  const requirePremium = (action) => {
+    if (premiumEnabled) {
+      if (typeof action === "function") action();
+      return true;
+    }
+
+    setActiveSection("premium");
+    setPremiumMessage(
+      "Esta herramienta pertenece a Sirius H&S Premium. Activa Premium para continuar."
+    );
+    return false;
+  };
+
   const changeSection = (section) => {
-    if (section !== "confirmaciones") stopCamera();
+    if (section !== "confirmaciones") {
+      stopCamera();
+    }
 
     setActiveSection(section);
     setShowCreateEvent(false);
@@ -88,75 +157,46 @@ function App() {
 
   const handleEventChange = (e) => {
     const { name, value } = e.target;
-    setEventData((old) => ({ ...old, [name]: value }));
+
+    setEventData((old) => ({
+      ...old,
+      [name]: value,
+    }));
   };
 
   const handleGuestChange = (e) => {
     const { name, value } = e.target;
-    setGuestData((old) => ({ ...old, [name]: value }));
-  };
 
-  const getEvent = (eventId) =>
-    events.find((event) => String(event.id) === String(eventId));
-
-  const getGuests = (eventId) =>
-    guests.filter((guest) => String(guest.eventId) === String(eventId));
-
-  const formatDate = (date) => {
-    if (!date) return "";
-    const parts = date.split("-");
-    return parts.length === 3
-      ? `${parts[2]}/${parts[1]}/${parts[0]}`
-      : date;
-  };
-
-  const editEvent = (event) => {
-    setEditingEventId(String(event.id));
-    setEventData({
-      name: event.name || "",
-      date: event.date || "",
-      time: event.time || "",
-      location: event.location || "",
-      passes: event.passes || 1,
-    });
-    setShowCreateEvent(true);
+    setGuestData((old) => ({
+      ...old,
+      [name]: value,
+    }));
   };
 
   const createEvent = (e) => {
     e.preventDefault();
 
-    if (!eventData.name || !eventData.date || !eventData.location) {
-      alert("Completa el nombre, fecha y lugar del evento.");
+    if (
+      !eventData.name ||
+      !eventData.date ||
+      !eventData.location
+    ) {
+      alert(
+        "Completa el nombre, fecha y lugar del evento."
+      );
       return;
     }
 
-    if (editingEventId) {
-      setEvents((old) =>
-        old.map((event) =>
-          String(event.id) === String(editingEventId)
-            ? {
-                ...event,
-                ...eventData,
-                passes: Number(eventData.passes),
-              }
-            : event
-        )
-      );
-      alert(`¡Evento "${eventData.name}" actualizado correctamente!`);
-      setEditingEventId(null);
-    } else {
-      const newEvent = {
-        id: Date.now(),
-        name: eventData.name,
-        date: eventData.date,
-        time: eventData.time,
-        location: eventData.location,
-        passes: Number(eventData.passes),
-      };
-      setEvents((old) => [...old, newEvent]);
-      setSelectedEventId(String(newEvent.id));
-      alert(`¡Evento "${newEvent.name}" creado correctamente!`);
-    }
+    const newEvent = {
+      id: Date.now(),
+      name: eventData.name,
+      date: eventData.date,
+      time: eventData.time,
+      location: eventData.location,
+      passes: Number(eventData.passes),
+    };
+
+    setEvents((old) => [...old, newEvent]);
 
     setEventData({
       name: "",
@@ -165,8 +205,14 @@ function App() {
       location: "",
       passes: 1,
     });
+
+    setSelectedEventId(String(newEvent.id));
     setShowCreateEvent(false);
     setActiveSection("eventos");
+
+    alert(
+      `ðŸ“… Evento "${newEvent.name}" creado correctamente!`
+    );
   };
 
   const addGuest = (e) => {
@@ -177,7 +223,7 @@ function App() {
       return;
     }
 
-    if (!guestData.name.trim()) {
+    if (!guestData.name) {
       alert("Escribe el nombre del invitado.");
       return;
     }
@@ -185,24 +231,57 @@ function App() {
     const newGuest = {
       id: Date.now(),
       eventId: Number(selectedEventId),
-      name: guestData.name.trim(),
-      phone: guestData.phone.trim(),
+      name: guestData.name,
+      phone: guestData.phone,
       passes: Number(guestData.passes),
       qrUsed: false,
       confirmed: false,
     };
 
     setGuests((old) => [...old, newGuest]);
-    setGuestData({ name: "", phone: "", passes: 1 });
+
+    setGuestData({
+      name: "",
+      phone: "",
+      passes: 1,
+    });
+
     setShowAddGuest(false);
-    alert(`¡Invitado "${newGuest.name}" agregado correctamente!`);
+
+    alert(
+      `ðŸ‘¤ Invitado "${newGuest.name}" agregado correctamente!`
+    );
+  };
+
+  const getEvent = (eventId) => {
+    return events.find(
+      (event) => event.id === Number(eventId)
+    );
+  };
+
+  const getGuests = (eventId) => {
+    return guests.filter(
+      (guest) => guest.eventId === Number(eventId)
+    );
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "";
+
+    const parts = date.split("-");
+
+    if (parts.length !== 3) {
+      return date;
+    }
+
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
   const createQRUrl = (guest) => {
     const event = getEvent(guest.eventId);
+
     const qrData = JSON.stringify({
       app: "SiriusHS",
-      version: 1,
       guestId: guest.id,
       eventId: guest.eventId,
       guest: guest.name,
@@ -210,32 +289,49 @@ function App() {
       passes: guest.passes,
     });
 
-    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-      qrData
-    )}`;
+    return (
+      "https://api.qrserver.com/v1/create-qr-code/" +
+      `?size=300x300&data=${encodeURIComponent(qrData)}`
+    );
   };
 
   const openInvitation = (guest) => {
     const event = getEvent(guest.eventId);
+
     if (!event) {
-      alert("No se encontró el evento de este invitado.");
+      alert("No se encontrÃ³ el evento de este invitado.");
       return;
     }
-    setSelectedInvitation({ guest, event });
+
+    setSelectedInvitation({
+      guest,
+      event,
+    });
+  };
+
+  const closeInvitation = () => {
+    setSelectedInvitation(null);
   };
 
   const validateQR = (decodedText) => {
     try {
       const data = JSON.parse(decodedText);
 
-      if (data.app !== "SiriusHS" && data.app !== "InvitaQR") {
-        setScanMessage("❌ Este QR no pertenece a Sirius H&S.");
+      if (
+        data.app !== "SiriusHS" &&
+        data.app !== "InvitaQR"
+      ) {
+        setScanMessage(
+          "âŒ Este QR no pertenece a Sirius H&S."
+        );
         setScanGuest(null);
         return false;
       }
 
       if (!data.guestId || !data.eventId) {
-        setScanMessage("❌ Este QR no contiene una invitación válida.");
+        setScanMessage(
+          "âŒ Este QR no contiene una invitaciÃ³n vÃ¡lida."
+        );
         setScanGuest(null);
         return false;
       }
@@ -245,33 +341,51 @@ function App() {
       );
 
       if (!guest) {
-        setScanMessage("❌ Invitado no encontrado.");
-        setScanGuest(null);
-        return false;
-      }
-
-      if (String(guest.eventId) !== String(data.eventId)) {
-        setScanMessage("❌ El QR no corresponde a este evento.");
+        setScanMessage(
+          "âŒ Invitado no encontrado."
+        );
         setScanGuest(null);
         return false;
       }
 
       if (guest.qrUsed) {
-        setScanMessage("🔴 Pase utilizado");
+        setScanMessage(
+          "ðŸ”´ Pase utilizado"
+        );
+
         setScanGuest(guest);
+
         return false;
       }
 
-      const updated = { ...guest, qrUsed: true, confirmed: true };
       setGuests((old) =>
-        old.map((item) => (item.id === guest.id ? updated : item))
+        old.map((item) =>
+          item.id === guest.id
+            ? {
+                ...item,
+                qrUsed: true,
+                confirmed: true,
+              }
+            : item
+        )
       );
-      setScanGuest(updated);
-      setScanMessage("✅ Pase válido");
+
+      setScanGuest({
+        ...guest,
+        qrUsed: true,
+        confirmed: true,
+      });
+
+      setScanMessage("âœ… Pase vÃ¡lido");
+
       return true;
     } catch {
-      setScanMessage("❌ El QR no es válido.");
+      setScanMessage(
+        "âŒ El QR no es vÃ¡lido."
+      );
+
       setScanGuest(null);
+
       return false;
     }
   };
@@ -283,46 +397,124 @@ function App() {
     }
 
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+
       streamRef.current = null;
     }
 
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
     setCameraActive(false);
   };
 
   const scanQRCode = async () => {
-    if (!videoRef.current || !streamRef.current) return;
+    if (!videoRef.current) {
+      return;
+    }
 
-    if (videoRef.current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      scanTimerRef.current = setTimeout(scanQRCode, 300);
+    if (!streamRef.current) {
+      return;
+    }
+
+    if (
+      videoRef.current.readyState <
+      HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+      scanTimerRef.current = setTimeout(
+        scanQRCode,
+        300
+      );
+
       return;
     }
 
     try {
       if ("BarcodeDetector" in window) {
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const barcodes = await detector.detect(videoRef.current);
+        const detector = new window.BarcodeDetector({
+          formats: ["qr_code"],
+        });
 
-        if (barcodes.length > 0 && barcodes[0].rawValue) {
-          const valid = validateQR(barcodes[0].rawValue);
-          if (valid || scanMessage) {
-            stopCamera();
-            return;
+        const barcodes =
+          await detector.detect(
+            videoRef.current
+          );
+
+        if (barcodes.length > 0) {
+          const value =
+            barcodes[0].rawValue;
+
+          if (value) {
+            const valid = validateQR(value);
+
+            if (valid) {
+              stopCamera();
+              return;
+            }
+
+            if (
+              scanMessage ===
+              "ðŸ”´ Pase utilizado"
+            ) {
+              stopCamera();
+              return;
+            }
+
+            if (
+              scanMessage ===
+              "âŒ Invitado no encontrado."
+            ) {
+              stopCamera();
+              return;
+            }
+
+            if (
+              scanMessage ===
+              "âŒ Este QR no pertenece a Sirius H&S."
+            ) {
+              stopCamera();
+              return;
+            }
+
+            if (
+              scanMessage ===
+              "âŒ Este QR no contiene una invitaciÃ³n vÃ¡lida."
+            ) {
+              stopCamera();
+              return;
+            }
+
+            if (
+              scanMessage ===
+              "âŒ El QR no es vÃ¡lido."
+            ) {
+              stopCamera();
+              return;
+            }
           }
         }
       } else {
         setCameraError(
-          "Tu navegador abrió la cámara, pero no tiene disponible el lector automático de códigos QR."
+          "Tu navegador abriÃ³ la cÃ¡mara, pero no tiene disponible el lector automÃ¡tico de cÃ³digos QR."
         );
+
         return;
       }
     } catch (error) {
-      console.log("Error leyendo QR:", error);
+      console.log(
+        "Error leyendo QR:",
+        error
+      );
     }
 
     if (streamRef.current) {
-      scanTimerRef.current = setTimeout(scanQRCode, 400);
+      scanTimerRef.current = setTimeout(
+        scanQRCode,
+        400
+      );
     }
   };
 
@@ -331,65 +523,105 @@ function App() {
     setScanMessage("");
     setScanGuest(null);
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Tu navegador no permite acceder a la cámara.");
-      return;
-    }
-
-    stopCamera();
-
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
+      if (
+        !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia
+      ) {
+        setCameraError(
+          "Tu navegador no permite acceder a la cÃ¡mara."
+        );
+
+        return;
+      }
+
+      stopCamera();
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: "environment",
+            },
+            width: {
+              ideal: 1280,
+            },
+            height: {
+              ideal: 720,
+            },
+          },
+          audio: false,
+        });
 
       streamRef.current = stream;
 
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        videoRef.current.srcObject =
+          stream;
+
         await videoRef.current.play();
       }
 
       setCameraActive(true);
-      setTimeout(scanQRCode, 500);
-    } catch (error) {
-      console.error("No se pudo abrir la cámara:", error);
 
-      if (error.name === "NotAllowedError") {
+      setTimeout(() => {
+        scanQRCode();
+      }, 500);
+    } catch (error) {
+      console.error(
+        "No se pudo abrir la cÃ¡mara:",
+        error
+      );
+
+      if (
+        error.name ===
+        "NotAllowedError"
+      ) {
         setCameraError(
-          "Permiso de cámara denegado. Permite el acceso a la cámara en tu navegador."
+          "Permiso de cÃ¡mara denegado. Permite el acceso a la cÃ¡mara en tu navegador."
         );
-      } else if (error.name === "NotFoundError") {
-        setCameraError("No se encontró ninguna cámara.");
+      } else if (
+        error.name ===
+        "NotFoundError"
+      ) {
+        setCameraError(
+          "No se encontrÃ³ ninguna cÃ¡mara."
+        );
       } else {
-        setCameraError("No se pudo abrir la cámara.");
+        setCameraError(
+          "No se pudo abrir la cÃ¡mara."
+        );
       }
+
+      setCameraActive(false);
     }
   };
 
-  const updateEditor = (key, value) => {
-    setEditorData((old) => ({ ...old, [key]: value }));
-  };
-
   const renderInicio = () => {
-    const confirmed = guests.filter((guest) => guest.confirmed).length;
-    const used = guests.filter((guest) => guest.qrUsed).length;
+    const confirmed = guests.filter(
+      (guest) => guest.confirmed
+    ).length;
+
+    const used = guests.filter(
+      (guest) => guest.qrUsed
+    ).length;
 
     return (
       <>
         <header className="topbar">
           <div>
-            <p className="welcome">Panel de administración</p>
-            <h2>¡Hola! 👋</h2>
+            <p className="welcome">
+              Panel de administraciÃ³n
+            </p>
+
+            <h2>ðŸ“·Hola! ðŸ‘‹</h2>
           </div>
+
           <button
             className="create-button"
-            onClick={() => setShowCreateEvent(true)}
+            onClick={() =>
+              setShowCreateEvent(true)
+            }
           >
             + Crear evento
           </button>
@@ -397,62 +629,107 @@ function App() {
 
         <section className="hero">
           <div>
-            <span className="hero-label">SIRIUS H&S · INVITACIONES INTELIGENTES</span>
+            <span className="hero-label">
+              SIRIUS H&S ðŸ“· INVITACIONES INTELIGENTES
+            </span>
+
             <h2>
-              Haz que cada invitación
+              Haz que cada invitaciÃ³n
               <br />
               sea especial.
             </h2>
+
             <p>
-              Crea eventos, administra invitados, genera códigos QR y controla
-              la asistencia desde un solo lugar.
+              Crea eventos, administra invitados,
+              genera cÃ³digos QR y controla la
+              asistencia desde un solo lugar.
             </p>
+
             <button
               className="hero-button"
-              onClick={() => setShowCreateEvent(true)}
+              onClick={() =>
+                setShowCreateEvent(true)
+              }
             >
-              Crear mi primer evento →
+              Crear mi primer evento â†’
             </button>
           </div>
 
           <div className="hero-card">
             <div className="qr-placeholder">
-              <div className="qr-pattern">✦</div>
+              <div className="qr-pattern">
+                <span>ðŸ“</span>
+              </div>
             </div>
+
             <div className="ticket-info">
-              <span>INVITACIÓN</span>
-              <strong>Mi próximo evento</strong>
-              <small>QR único para cada invitado</small>
+              <span>INVITACIÃ“N</span>
+
+              <strong>
+                Mi prÃ³ximo evento
+              </strong>
+
+              <small>
+                QR Ãºnico para cada invitado
+              </small>
             </div>
           </div>
         </section>
 
         <section className="stats">
-          {[
-            ["✦", "Eventos", events.length],
-            ["♣", "Invitados", guests.length],
-            ["✓", "Confirmados", confirmed],
-            ["▣", "Pases utilizados", used],
-          ].map(([icon, label, value]) => (
-            <div className="stat-card" key={label}>
-              <div className="stat-icon">{icon}</div>
-              <div>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
+          <div className="stat-card">
+            <div className="stat-icon">âœ¦</div>
+
+            <div>
+              <span>Eventos</span>
+              <strong>{events.length}</strong>
             </div>
-          ))}
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">â™™</div>
+
+            <div>
+              <span>Invitados</span>
+              <strong>{guests.length}</strong>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">âœ“</div>
+
+            <div>
+              <span>Confirmados</span>
+              <strong>{confirmed}</strong>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">ðŸ“</div>
+
+            <div>
+              <span>Pases utilizados</span>
+              <strong>{used}</strong>
+            </div>
+          </div>
         </section>
 
         <section className="content-section">
           <div className="section-heading">
             <div>
               <h3>Mis eventos</h3>
-              <p>Administra tus eventos y sus invitaciones.</p>
+
+              <p>
+                Administra tus eventos y sus
+                invitaciones.
+              </p>
             </div>
+
             <button
               className="outline-button"
-              onClick={() => changeSection("eventos")}
+              onClick={() =>
+                changeSection("eventos")
+              }
             >
               Ver todos
             </button>
@@ -460,23 +737,57 @@ function App() {
 
           {events.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">✦</div>
-              <h3>Aún no tienes eventos</h3>
-              <p>Crea tu primer evento y comienza a enviar invitaciones inteligentes.</p>
-              <button className="create-button" onClick={() => setShowCreateEvent(true)}>
+              <div className="empty-icon">âœ¦</div>
+
+              <h3>
+                AÃºn no tienes eventos
+              </h3>
+
+              <p>
+                Crea tu primer evento y comienza
+                a enviar invitaciones inteligentes.
+              </p>
+
+              <button
+                className="create-button"
+                onClick={() =>
+                  setShowCreateEvent(true)
+                }
+              >
                 + Crear evento
               </button>
             </div>
           ) : (
             <div className="events-list">
               {events.map((event) => (
-                <div className="event-card" key={event.id}>
-                  <div className="event-card-icon">✦</div>
+                <div
+                  className="event-card"
+                  key={event.id}
+                >
+                  <div className="event-card-icon">
+                    âœ¦
+                  </div>
+
                   <div className="event-card-info">
                     <h3>{event.name}</h3>
-                    <p>📅 {formatDate(event.date)}{event.time && ` · ${event.time}`}</p>
-                    <p>📍 {event.location}</p>
-                    <small>{getGuests(event.id).length} invitado(s)</small>
+
+                    <p>
+                      ðŸ“…{" "}
+                      {formatDate(event.date)}
+                      {event.time &&
+                        ` ðŸ“· ${event.time}`}
+                    </p>
+
+                    <p>
+                      ðŸ“ {event.location}
+                    </p>
+
+                    <small>
+                      {
+                        getGuests(event.id).length
+                      }{" "}
+                      invitado(s)
+                    </small>
                   </div>
                 </div>
               ))}
@@ -487,129 +798,235 @@ function App() {
     );
   };
 
-  const renderEventos = () => (
-    <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <h3>Mis eventos</h3>
-          <p>Administra tus eventos y sus invitaciones.</p>
-        </div>
-        <button className="create-button" onClick={() => setShowCreateEvent(true)}>
-          + Crear evento
-        </button>
-      </div>
+  const renderEventos = () => {
+    return (
+      <section className="content-section">
+        <div className="section-heading">
+          <div>
+            <h3>Mis eventos</h3>
 
-      {events.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">✦</div>
-          <h3>Aún no tienes eventos</h3>
-          <button className="create-button" onClick={() => setShowCreateEvent(true)}>
+            <p>
+              Administra tus eventos y sus
+              invitaciones.
+            </p>
+          </div>
+
+          <button
+            className="create-button"
+            onClick={() =>
+              setShowCreateEvent(true)
+            }
+          >
             + Crear evento
           </button>
         </div>
-      ) : (
-        <div className="events-list">
-          {events.map((event) => (
-            <div className="event-card" key={event.id}>
-              <div className="event-card-icon">✦</div>
-              <div className="event-card-info">
-                <h3>{event.name}</h3>
-                <p>📅 {formatDate(event.date)}{event.time && ` · ${event.time}`}</p>
-                <p>📍 {event.location}</p>
-                <small>{getGuests(event.id).length} invitado(s)</small>
+
+        {events.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">âœ¦</div>
+
+            <h3>
+              AÃºn no tienes eventos
+            </h3>
+
+            <button
+              className="create-button"
+              onClick={() =>
+                setShowCreateEvent(true)
+              }
+            >
+              + Crear evento
+            </button>
+          </div>
+        ) : (
+          <div className="events-list">
+            {events.map((event) => (
+              <div
+                className="event-card"
+                key={event.id}
+              >
+                <div className="event-card-icon">
+                  âœ¦
+                </div>
+
+                <div className="event-card-info">
+                  <h3>{event.name}</h3>
+
+                  <p>
+                    ðŸ“…{" "}
+                    {formatDate(event.date)}
+                    {event.time &&
+                      ` ðŸ“· ${event.time}`}
+                  </p>
+
+                  <p>
+                    ðŸ“ {event.location}
+                  </p>
+
+                  <small>
+                    {
+                      getGuests(event.id).length
+                    }{" "}
+                    invitado(s)
+                  </small>
+                </div>
+
+                <button
+                  className="outline-button"
+                  onClick={() => {
+                    setSelectedEventId(
+                      String(event.id)
+                    );
+                    changeSection(
+                      "invitados"
+                    );
+                  }}
+                >
+                  Invitados
+                </button>
               </div>
-
-              <button
-                className="outline-button"
-                onClick={() => {
-                  setSelectedEventId(String(event.id));
-                  changeSection("invitados");
-                }}
-              >
-                Invitados
-              </button>
-
-              <button className="outline-button" onClick={() => editEvent(event)}>
-                Editar
-              </button>
-
-              <button
-                className="outline-button"
-                onClick={() => {
-                  setSelectedEventId(String(event.id));
-                  changeSection("editor");
-                }}
-              >
-                Diseñar
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  };
 
   const renderInvitados = () => {
-    const selectedGuests = selectedEventId ? getGuests(selectedEventId) : [];
+    const selectedGuests =
+      selectedEventId
+        ? getGuests(selectedEventId)
+        : [];
 
     return (
       <section className="content-section">
         <div className="section-heading">
           <div>
             <h3>Invitados</h3>
-            <p>Administra los invitados de tus eventos.</p>
+
+            <p>
+              Administra los invitados de tus
+              eventos.
+            </p>
           </div>
-          <button className="create-button" onClick={() => setShowAddGuest(true)}>
+
+          <button
+            className="create-button"
+            onClick={() =>
+              setShowAddGuest(true)
+            }
+          >
             + Agregar invitado
           </button>
         </div>
 
         <div className="form-group">
-          <label>Selecciona un evento</label>
-          <select value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}>
-            <option value="">Selecciona un evento</option>
+          <label>
+            Selecciona un evento
+          </label>
+
+          <select
+            value={selectedEventId}
+            onChange={(e) =>
+              setSelectedEventId(
+                e.target.value
+              )
+            }
+          >
+            <option value="">
+              Selecciona un evento
+            </option>
+
             {events.map((event) => (
-              <option key={event.id} value={event.id}>{event.name}</option>
+              <option
+                key={event.id}
+                value={event.id}
+              >
+                {event.name}
+              </option>
             ))}
           </select>
         </div>
 
         {!selectedEventId ? (
           <div className="empty-state">
-            <div className="empty-icon">♣</div>
-            <h3>Selecciona un evento</h3>
-            <p>Elige un evento para ver sus invitados.</p>
+            <div className="empty-icon">â™™</div>
+
+            <h3>
+              Selecciona un evento
+            </h3>
+
+            <p>
+              Elige un evento para ver sus
+              invitados.
+            </p>
           </div>
         ) : selectedGuests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">♣</div>
-            <h3>Aún no hay invitados</h3>
-            <p>Agrega el primer invitado de este evento.</p>
-            <button className="create-button" onClick={() => setShowAddGuest(true)}>
+            <div className="empty-icon">â™™</div>
+
+            <h3>
+              AÃºn no hay invitados
+            </h3>
+
+            <p>
+              Agrega el primer invitado de este
+              evento.
+            </p>
+
+            <button
+              className="create-button"
+              onClick={() =>
+                setShowAddGuest(true)
+              }
+            >
               + Agregar invitado
             </button>
           </div>
         ) : (
           <div className="events-list">
             {selectedGuests.map((guest) => (
-              <div className="event-card" key={guest.id}>
-                <div className="event-card-icon">♣</div>
+              <div
+                className="event-card"
+                key={guest.id}
+              >
+                <div className="event-card-icon">
+                  â™™
+                </div>
+
                 <div className="event-card-info">
                   <h3>{guest.name}</h3>
-                  <p>{guest.phone || "Sin teléfono"}</p>
+
+                  <p>
+                    {guest.phone ||
+                      "Sin telÃ©fono"}
+                  </p>
+
                   <small>
-                    {guest.passes} pase(s) · {guest.qrUsed ? "🔴 Pase utilizado" : "🟢 Pase disponible"}
+                    {guest.passes} pase(s)
+                    {" ðŸ“· "}
+                    {guest.qrUsed
+                      ? "ðŸ”´ Pase utilizado"
+                      : "ðŸŸ¢ Pase disponible"}
                   </small>
                 </div>
 
                 <div className="guest-actions">
-                  <button className="outline-button" onClick={() => openInvitation(guest)}>
-                    Ver invitación
+                  <button
+                    className="outline-button"
+                    onClick={() =>
+                      openInvitation(guest)
+                    }
+                  >
+                    Ver invitaciÃ³n
                   </button>
+
                   <button
                     className="outline-button"
                     onClick={() => {
-                      setSelectedEventId(String(guest.eventId));
+                      setSelectedEventId(
+                        String(guest.eventId)
+                      );
                       changeSection("qr");
                     }}
                   >
@@ -625,52 +1042,121 @@ function App() {
   };
 
   const renderQR = () => {
-    const selectedGuests = selectedEventId ? getGuests(selectedEventId) : [];
+    const selectedGuests =
+      selectedEventId
+        ? getGuests(selectedEventId)
+        : [];
 
     return (
       <section className="content-section">
         <div className="section-heading">
           <div>
-            <h3>Códigos QR</h3>
-            <p>Cada invitado tiene un QR único.</p>
+            <h3>CÃ³digos QR</h3>
+
+            <p>
+              Cada invitado tiene un QR Ãºnico.
+            </p>
           </div>
         </div>
 
         <div className="form-group">
-          <label>Selecciona un evento</label>
-          <select value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}>
-            <option value="">Selecciona un evento</option>
+          <label>
+            Selecciona un evento
+          </label>
+
+          <select
+            value={selectedEventId}
+            onChange={(e) =>
+              setSelectedEventId(
+                e.target.value
+              )
+            }
+          >
+            <option value="">
+              Selecciona un evento
+            </option>
+
             {events.map((event) => (
-              <option key={event.id} value={event.id}>{event.name}</option>
+              <option
+                key={event.id}
+                value={event.id}
+              >
+                {event.name}
+              </option>
             ))}
           </select>
         </div>
 
         {selectedGuests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">▣</div>
-            <h3>No hay invitados</h3>
-            <p>Agrega invitados para generar sus códigos QR.</p>
+            <div className="empty-icon">ðŸ“</div>
+
+            <h3>
+              No hay invitados
+            </h3>
+
+            <p>
+              Agrega invitados para generar
+              sus cÃ³digos QR.
+            </p>
           </div>
         ) : (
           <div className="qr-grid">
             {selectedGuests.map((guest) => (
-              <div className="qr-card" key={guest.id}>
+              <div
+                className="qr-card"
+                key={guest.id}
+              >
                 <div className="qr-card-image">
-                  <img src={createQRUrl(guest)} alt={`QR de ${guest.name}`} />
+                  <img
+                    src={createQRUrl(guest)}
+                    alt={`QR de ${guest.name}`}
+                  />
                 </div>
+
                 <div className="qr-card-info">
-                  <span>INVITACIÓN</span>
+                  <span>INVITACIÃ“N</span>
+
                   <h3>{guest.name}</h3>
-                  <p>{getEvent(guest.eventId)?.name}</p>
-                  <small>{guest.passes} pase(s)</small>
-                  <p>{guest.qrUsed ? "🔴 Pase utilizado" : "🟢 Pase disponible"}</p>
+
+                  <p>
+                    {
+                      getEvent(
+                        guest.eventId
+                      )?.name
+                    }
+                  </p>
+
+                  <small>
+                    {guest.passes} pase(s)
+                  </small>
+
+                  <p>
+                    {guest.qrUsed
+                      ? "ðŸ”´ Pase utilizado"
+                      : "ðŸŸ¢ Pase disponible"}
+                  </p>
                 </div>
-                <button className="create-button" onClick={() => window.open(createQRUrl(guest), "_blank")}>
+
+                <button
+                  className="create-button"
+                  onClick={() =>
+                    window.open(
+                      createQRUrl(guest),
+                      "_blank"
+                    )
+                  }
+                >
                   Abrir QR
                 </button>
-                <button className="outline-button" onClick={() => openInvitation(guest)}>
-                  Ver invitación
+
+                <button
+                  className="outline-button"
+                  onClick={() =>
+                    openInvitation(guest)
+                  }
+                >
+                  Ver invitaciÃ³n
                 </button>
               </div>
             ))}
@@ -680,101 +1166,205 @@ function App() {
     );
   };
 
-  const renderConfirmaciones = () => (
-    <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <h3>Confirmaciones</h3>
-          <p>Valida la entrada de tus invitados con la cámara.</p>
+  const renderConfirmaciones = () => {
+    return (
+      <section className="content-section">
+        <div className="section-heading">
+          <div>
+            <h3>Confirmaciones</h3>
+
+            <p>
+              Valida la entrada de tus invitados.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="scanner-box">
-        <h3>Escanear código QR</h3>
-        <p>Apunta la cámara al código QR de la invitación.</p>
+        <div className="scanner-box">
+          <h3>
+            Escanear cÃ³digo QR
+          </h3>
 
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 520,
-            margin: "20px auto",
-            borderRadius: 20,
-            overflow: "hidden",
-            background: "#111",
-            position: "relative",
-            minHeight: cameraActive ? 360 : 180,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {cameraActive ? (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{ width: "100%", display: "block" }}
-              />
+          <p>
+            Apunta la cÃ¡mara al cÃ³digo QR de
+            la invitaciÃ³n.
+          </p>
+
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "520px",
+              margin: "20px auto",
+              borderRadius: "20px",
+              overflow: "hidden",
+              background: "#111",
+              position: "relative",
+              minHeight: cameraActive
+                ? "360px"
+                : "180px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {cameraActive ? (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  style={{
+                    width: "100%",
+                    display: "block",
+                    borderRadius: "20px",
+                  }}
+                />
+
+                <div
+                  style={{
+                    position: "absolute",
+                    width: "65%",
+                    height: "65%",
+                    border:
+                      "3px solid white",
+                    borderRadius: "18px",
+                    pointerEvents: "none",
+                  }}
+                />
+              </>
+            ) : (
               <div
                 style={{
-                  position: "absolute",
-                  width: "65%",
-                  height: "65%",
-                  border: "3px solid #fff",
-                  borderRadius: 18,
-                  pointerEvents: "none",
+                  color: "white",
+                  textAlign: "center",
+                  padding: "35px",
                 }}
-              />
-            </>
-          ) : (
-            <div style={{ color: "white", textAlign: "center", padding: 35 }}>
-              <div style={{ fontSize: 55 }}>📷</div>
-              <strong>Cámara apagada</strong>
-              <p>Presiona el botón para comenzar.</p>
+              >
+                <div
+                  style={{
+                    fontSize: "55px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  ðŸ“·
+                </div>
+
+                <strong>
+                  CÃ¡mara apagada
+                </strong>
+
+                <p
+                  style={{
+                    marginTop: "8px",
+                    opacity: 0.8,
+                  }}
+                >
+                  Presiona el botÃ³n para
+                  comenzar.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {cameraError && (
+            <div
+              className="scan-result"
+              style={{
+                marginBottom: "15px",
+              }}
+            >
+              <p>
+                âš ï¸ {cameraError}
+              </p>
             </div>
           )}
+
+          <div
+            className="modal-actions"
+            style={{
+              justifyContent: "center",
+            }}
+          >
+            {!cameraActive ? (
+              <button
+                className="create-button"
+                onClick={startCamera}
+              >
+                ðŸ“· Abrir cÃ¡mara
+              </button>
+            ) : (
+              <button
+                className="cancel-button"
+                onClick={stopCamera}
+              >
+                âœ• Detener cÃ¡mara
+              </button>
+            )}
+          </div>
         </div>
 
-        {cameraError && (
-          <div className="scan-result">
-            <p>⚠️ {cameraError}</p>
+        {scanMessage && (
+          <div
+            className="scan-result"
+            style={{
+              marginTop: "20px",
+              textAlign: "center",
+            }}
+          >
+            <h2>{scanMessage}</h2>
+
+            {scanGuest && (
+              <div
+                style={{
+                  marginTop: "15px",
+                }}
+              >
+                <p>
+                  Invitado:{" "}
+                  <strong>
+                    {scanGuest.name}
+                  </strong>
+                </p>
+
+                <p>
+                  Pases:{" "}
+                  <strong>
+                    {scanGuest.passes}
+                  </strong>
+                </p>
+
+                {getEvent(
+                  scanGuest.eventId
+                ) && (
+                  <p>
+                    Evento:{" "}
+                    <strong>
+                      {
+                        getEvent(
+                          scanGuest.eventId
+                        ).name
+                      }
+                    </strong>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
-
-        <div className="modal-actions" style={{ justifyContent: "center" }}>
-          {!cameraActive ? (
-            <button className="create-button" onClick={startCamera}>
-              📷 Abrir cámara
-            </button>
-          ) : (
-            <button className="cancel-button" onClick={stopCamera}>
-              ✕ Detener cámara
-            </button>
-          )}
-        </div>
-      </div>
-
-      {scanMessage && (
-        <div className="scan-result" style={{ marginTop: 20, textAlign: "center" }}>
-          <h2>{scanMessage}</h2>
-          {scanGuest && (
-            <div style={{ marginTop: 15 }}>
-              <p>Invitado: <strong>{scanGuest.name}</strong></p>
-              <p>Pases: <strong>{scanGuest.passes}</strong></p>
-              <p>Evento: <strong>{getEvent(scanGuest.eventId)?.name}</strong></p>
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  );
+      </section>
+    );
+  };
 
   const renderMapa = () => {
-    const selectedEvent = selectedEventId ? getEvent(selectedEventId) : null;
+    const selectedEvent =
+      selectedEventId
+        ? getEvent(selectedEventId)
+        : null;
+
     const mapUrl = selectedEvent
-      ? `https://www.openstreetmap.org/export/embed.html?search=${encodeURIComponent(selectedEvent.location)}`
+      ? `https://www.openstreetmap.org/export/embed.html?search=${encodeURIComponent(
+          selectedEvent.location
+        )}`
       : "";
 
     return (
@@ -782,42 +1372,80 @@ function App() {
         <div className="section-heading">
           <div>
             <h3>Mapa</h3>
-            <p>Ubica el lugar de tu evento.</p>
+
+            <p>
+              Ubica el lugar de tu evento.
+            </p>
           </div>
         </div>
 
         <div className="form-group">
-          <label>Selecciona un evento</label>
-          <select value={selectedEventId} onChange={(e) => setSelectedEventId(e.target.value)}>
-            <option value="">Selecciona un evento</option>
+          <label>
+            Selecciona un evento
+          </label>
+
+          <select
+            value={selectedEventId}
+            onChange={(e) =>
+              setSelectedEventId(
+                e.target.value
+              )
+            }
+          >
+            <option value="">
+              Selecciona un evento
+            </option>
+
             {events.map((event) => (
-              <option key={event.id} value={event.id}>{event.name}</option>
+              <option
+                key={event.id}
+                value={event.id}
+              >
+                {event.name}
+              </option>
             ))}
           </select>
         </div>
 
         {!selectedEvent ? (
           <div className="empty-state">
-            <div className="empty-icon">⌖</div>
-            <h3>Selecciona un evento</h3>
-            <p>Elige un evento para mostrar su ubicación.</p>
+            <div className="empty-icon">ðŸ“·</div>
+
+            <h3>
+              Selecciona un evento
+            </h3>
+
+            <p>
+              Elige un evento para mostrar
+              su ubicaciÃ³n.
+            </p>
           </div>
         ) : (
           <div className="map-card">
             <h3>{selectedEvent.name}</h3>
-            <p>📍 {selectedEvent.location}</p>
+
+            <p>
+              ðŸ“ {selectedEvent.location}
+            </p>
+
             <div className="map-container">
               <iframe
                 title={`Mapa de ${selectedEvent.name}`}
                 src={mapUrl}
                 width="100%"
                 height="450"
-                style={{ border: 0, borderRadius: 18 }}
+                style={{
+                  border: 0,
+                  borderRadius: "18px",
+                }}
                 loading="lazy"
               />
             </div>
+
             <a
-              href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(selectedEvent.location)}`}
+              href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                selectedEvent.location
+              )}`}
               target="_blank"
               rel="noreferrer"
               className="outline-button map-link"
@@ -830,445 +1458,622 @@ function App() {
     );
   };
 
-  const renderEditor = () => {
-    const event = selectedEventId ? getEvent(selectedEventId) : events[0];
-    const previewTitle = editorData.title || event?.name || "Nuestra celebración";
+  const renderConfiguracion = () => {
+    return (
+      <section className="content-section">
+        <div className="section-heading">
+          <div>
+            <span className="hero-label">
+              SIRIUS H&S
+            </span>
+
+            <h3>ConfiguraciÃ³n</h3>
+
+            <p>
+              ConfiguraciÃ³n general de tu aplicaciÃ³n.
+            </p>
+          </div>
+        </div>
+
+        <div className="empty-state">
+          <div className="empty-icon">âš™</div>
+
+          <h3>
+            ConfiguraciÃ³n
+          </h3>
+
+          <p>
+            PrÃ³ximamente podrÃ¡s personalizar
+            mÃ¡s opciones de Sirius H&S.
+          </p>
+        </div>
+      </section>
+    );
+  };
+
+  const renderPremium = () => {
+    const premiumFeatures = [
+      "Invitaciones premium",
+      "DiseÃ±os exclusivos",
+      "PersonalizaciÃ³n avanzada",
+      "Mapas estilizados",
+      "Animaciones avanzadas",
+      "MÃºsica y voz",
+      "Avatares",
+      "Herramientas de referencia visual",
+    ];
 
     return (
       <section className="content-section">
         <div className="section-heading">
           <div>
-            <span className="hero-label">SIRIUS H&S · EDITOR</span>
-            <h3>Diseña tu invitación</h3>
-            <p>Esta es la primera versión del editor. Todo lo que cambies se guarda localmente.</p>
+            <span className="hero-label">SIRIUS H&S</span>
+            <h3>Desbloqueos Premium</h3>
+            <p>
+              Administra el acceso a las funciones avanzadas de Sirius H&S.
+            </p>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Evento que vas a diseñar</label>
-          <select
-            value={selectedEventId}
-            onChange={(e) => setSelectedEventId(e.target.value)}
-          >
-            <option value="">Selecciona un evento</option>
-            {events.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
+        <div className="premium-hero">
+          <div className="premium-crown">â™›</div>
+          <div>
+            <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
+            <h2>
+              {premiumEnabled
+                ? "Premium estÃ¡ activo"
+                : "Lleva tus invitaciones al siguiente nivel"}
+            </h2>
+            <p>
+              {premiumEnabled
+                ? "Las funciones Premium estÃ¡n habilitadas en este dispositivo."
+                : "DiseÃ±os, mapas, animaciones y herramientas creativas avanzadas."}
+            </p>
+          </div>
         </div>
 
-        {!event ? (
-          <div className="empty-state">
-            <div className="empty-icon">✦</div>
-            <h3>Primero crea un evento</h3>
-            <p>Después podrás comenzar a diseñar su invitación.</p>
-            <button className="create-button" onClick={() => setShowCreateEvent(true)}>
-              + Crear evento
-            </button>
-          </div>
-        ) : (
+        {premiumMessage && (
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(280px, 360px) minmax(320px, 1fr)",
-              gap: 24,
-              alignItems: "start",
-            }}
+            className="stat-card"
+            style={{ marginTop: "18px" }}
+            role="status"
           >
-            <div className="event-modal" style={{ maxWidth: "none" }}>
-              <span className="hero-label">HERRAMIENTAS</span>
-
-              <div className="form-group">
-                <label>Título</label>
-                <input
-                  value={editorData.title}
-                  onChange={(e) => updateEditor("title", e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Subtítulo</label>
-                <input
-                  value={editorData.subtitle}
-                  onChange={(e) => updateEditor("subtitle", e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Mensaje</label>
-                <textarea
-                  rows="4"
-                  value={editorData.message}
-                  onChange={(e) => updateEditor("message", e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Estilo</label>
-                <select
-                  value={editorData.theme}
-                  onChange={(e) => updateEditor("theme", e.target.value)}
-                >
-                  <option value="elegante">Elegante</option>
-                  <option value="romantico">Romántico</option>
-                  <option value="minimalista">Minimalista</option>
-                  <option value="dorado">Dorado Premium</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Animación</label>
-                <select
-                  value={editorData.animation}
-                  onChange={(e) => updateEditor("animation", e.target.value)}
-                >
-                  <option value="suave">Suave</option>
-                  <option value="cinematografica">Cinematográfica</option>
-                  <option value="particulas">Partículas</option>
-                </select>
-              </div>
-
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={editorData.music}
-                  onChange={(e) => updateEditor("music", e.target.checked)}
-                />{" "}
-                Música
-              </label>
-
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={editorData.map}
-                  onChange={(e) => updateEditor("map", e.target.checked)}
-                />{" "}
-                Mapa
-              </label>
-
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={editorData.qr}
-                  onChange={(e) => updateEditor("qr", e.target.checked)}
-                />{" "}
-                Código QR
-              </label>
-
-              <button
-                className="create-button"
-                onClick={() => changeSection("premium")}
-              >
-                ✦ Ver herramientas Premium
-              </button>
-            </div>
-
-            <div
-              style={{
-                minHeight: 620,
-                borderRadius: 28,
-                padding: 24,
-                background:
-                  editorData.theme === "dorado"
-                    ? "linear-gradient(145deg,#090909,#2a210b,#090909)"
-                    : "linear-gradient(145deg,#0b0b0b,#171717,#090909)",
-                color: "#fff",
-                boxShadow: "0 20px 60px rgba(0,0,0,.25)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div style={{ width: "100%", maxWidth: 520, textAlign: "center" }}>
-                <span className="hero-label">{event.name}</span>
-                <h1 style={{ fontSize: 46, margin: "25px 0 10px" }}>
-                  {previewTitle}
-                </h1>
-                <p style={{ fontSize: 18, opacity: 0.8 }}>{editorData.subtitle}</p>
-
-                <div style={{ margin: "35px auto", maxWidth: 430 }}>
-                  <p style={{ lineHeight: 1.8 }}>{editorData.message}</p>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 12,
-                    padding: 20,
-                    borderRadius: 20,
-                    background: "rgba(255,255,255,.06)",
-                  }}
-                >
-                  <strong>📅 {formatDate(event.date)}</strong>
-                  <strong>🕐 {event.time || "Hora por confirmar"}</strong>
-                  <strong>📍 {event.location}</strong>
-                </div>
-
-                {editorData.qr && (
-                  <div style={{ marginTop: 25 }}>
-                    <span>QR de invitación</span>
-                  </div>
-                )}
-
-                {editorData.map && (
-                  <div style={{ marginTop: 15, opacity: 0.7 }}>
-                    📍 Ubicación interactiva
-                  </div>
-                )}
-
-                {editorData.music && (
-                  <div style={{ marginTop: 15, opacity: 0.7 }}>
-                    ♪ Música activada
-                  </div>
-                )}
-              </div>
-            </div>
+            {premiumMessage}
           </div>
         )}
+
+        <div className="premium-plans">
+          <div className="premium-card free-plan">
+            <span className="plan-badge">GRATIS</span>
+            <h3>Plan Gratis</h3>
+            <div className="plan-price">
+              $0 <small>MXN</small>
+            </div>
+            <p>Todo lo necesario para comenzar a crear tus eventos.</p>
+            <ul>
+              <li>âœ“ Crear eventos</li>
+              <li>âœ“ Administrar invitados</li>
+              <li>âœ“ 1 pase por invitado</li>
+              <li>âœ“ CÃ³digos QR</li>
+              <li>âœ“ ConfirmaciÃ³n con cÃ¡mara</li>
+              <li>âœ“ Mapa del evento</li>
+              <li>âœ“ InvitaciÃ³n digital</li>
+            </ul>
+            <button className="outline-button" disabled>
+              {premiumEnabled ? "Plan disponible" : "Plan actual"}
+            </button>
+          </div>
+
+          <div className="premium-card premium-plan">
+            <div className="crown-realistic">â™›</div>
+            <span className="plan-badge premium-badge">PREMIUM</span>
+            <h3>Sirius H&S Premium</h3>
+            <div className="plan-price">
+              {premiumEnabled ? "ACTIVO" : "Acceso Premium"}
+            </div>
+            <p>
+              Desbloquea una experiencia mÃ¡s exclusiva para tus eventos.
+            </p>
+            <ul>
+              {premiumFeatures.map((feature) => (
+                <li key={feature}>âœ“ {feature}</li>
+              ))}
+            </ul>
+
+            {OWNER_MODE ? (
+              <button
+                className="create-button premium-button"
+                type="button"
+                disabled
+              >
+                ðŸ‘‘ Premium de propietaria â€” ACTIVO
+              </button>
+            ) : !premiumEnabled ? (
+              <button
+                className="create-button premium-button"
+                onClick={activatePremiumDemo}
+              >
+                â™› Activar Premium (prueba)
+              </button>
+            ) : (
+              <button
+                className="outline-button"
+                onClick={deactivatePremium}
+              >
+                Desactivar en este dispositivo
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="premium-note">
+          <strong>â™› Sirius H&S</strong>
+          <p>
+            El acceso Premium se guarda localmente para esta instalaciÃ³n.
+            La activaciÃ³n de pago real todavÃ­a requiere un servidor y una
+            pasarela de pagos; nunca debe confiarse Ãºnicamente en localStorage.
+          </p>
+        </div>
+
+        <div className="premium-card" style={{ marginTop: "20px" }}>
+          <span className="plan-badge">ESTADO DEL SISTEMA</span>
+          <h3>{premiumEnabled ? "Premium habilitado" : "Plan Gratis activo"}</h3>
+          <p>
+            {premiumEnabled
+              ? "Ya puedes conectar aquÃ­ las herramientas avanzadas de Sirius H&S."
+              : "Las funciones gratuitas siguen funcionando normalmente. Las funciones Premium pueden protegerse mediante requirePremium()."}
+          </p>
+          {!premiumEnabled && (
+            <button
+              className="outline-button"
+              onClick={() => requirePremium()}
+            >
+              Probar protecciÃ³n Premium
+            </button>
+          )}
+        </div>
       </section>
     );
   };
 
-  const renderConfiguracion = () => (
-    <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <span className="hero-label">SIRIUS H&S</span>
-          <h3>Configuración</h3>
-          <p>Configuración general de tu aplicación.</p>
-        </div>
-      </div>
-      <div className="empty-state">
-        <div className="empty-icon">⚙</div>
-        <h3>Configuración</h3>
-        <p>Próximamente podrás personalizar más opciones de Sirius H&S.</p>
-      </div>
-    </section>
-  );
-
-  const renderPremium = () => (
-    <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <span className="hero-label">SIRIUS H&S</span>
-          <h3>Desbloqueos Premium</h3>
-          <p>Comienza gratis y descubre las herramientas avanzadas.</p>
-        </div>
-      </div>
-
-      <div className="premium-hero">
-        <div className="premium-crown">♛</div>
-        <div>
-          <span className="premium-label">EXPERIENCIA SIRIUS H&S</span>
-          <h2>Lleva tus invitaciones al siguiente nivel</h2>
-          <p>Diseños, mapas, animaciones y herramientas creativas avanzadas.</p>
-        </div>
-      </div>
-
-      <div className="premium-plans">
-        <div className="premium-card free-plan">
-          <span className="plan-badge">GRATIS</span>
-          <h3>Plan Gratis</h3>
-          <div className="plan-price">$0 <small>MXN</small></div>
-          <ul>
-            <li>✓ Crear eventos</li>
-            <li>✓ Administrar invitados</li>
-            <li>✓ Pases</li>
-            <li>✓ Códigos QR</li>
-            <li>✓ Confirmación con cámara</li>
-            <li>✓ Mapa</li>
-            <li>✓ Editor básico</li>
-          </ul>
-          <button className="outline-button" disabled>Plan actual</button>
-        </div>
-
-        <div className="premium-card premium-plan">
-          <div className="crown-realistic">♛</div>
-          <span className="plan-badge premium-badge">PREMIUM</span>
-          <h3>Sirius H&S Premium</h3>
-          <div className="plan-price">Próximamente</div>
-          <ul>
-            <li>✓ Todo lo incluido en Gratis</li>
-            <li>✓ Editor avanzado</li>
-            <li>✓ Plantillas Premium</li>
-            <li>✓ Mapas estilizados</li>
-            <li>✓ Animaciones avanzadas</li>
-            <li>✓ Música y voz</li>
-            <li>✓ Avatares</li>
-            <li>✓ Herramientas de referencia visual</li>
-          </ul>
-          <button
-            className="create-button premium-button"
-            onClick={() => alert("Sirius H&S Premium estará disponible próximamente.")}
-          >
-            ♛ Desbloquear Premium
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-
-  const navItems = [
-    ["inicio", "⌂", "Inicio"],
-    ["eventos", "✦", "Mis eventos"],
-    ["editor", "✎", "Invitaciones / Editor"],
-    ["invitados", "♣", "Invitados"],
-    ["qr", "▣", "Códigos QR"],
-    ["confirmaciones", "✓", "Confirmaciones"],
-    ["mapa", "⌖", "Mapa"],
-    ["premium", "♛", "Desbloqueos Premium"],
-    ["configuracion", "⚙", "Configuración"],
-  ];
-
   return (
     <div className="app">
+
       <aside className="sidebar">
+
         <div className="brand">
-          <div className="brand-icon">♛</div>
-          <div>
-            <h1>Sirius H&S</h1>
-            <span>Invitaciones inteligentes</span>
+
+          <div className="brand-icon">
+            â™›
+
+        <div className="language-selector">
+          <span className="language-label">?? Idioma</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            aria-label="Seleccionar idioma"
+          >
+            {LANGUAGES.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.flag} {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
           </div>
+
+          <div>
+            <h1>
+              Sirius H&S
+            </h1>
+
+            <span>
+              Invitaciones inteligentes
+            </span>
+          </div>
+
         </div>
 
         <nav>
-          {navItems.map(([section, icon, label]) => (
-            <button
-              key={section}
-              className={`nav-item ${activeSection === section ? "active" : ""} ${
-                section === "premium" ? "premium-nav-item" : ""
-              }`}
-              onClick={() => changeSection(section)}
-            >
-              <span>{icon}</span>
-              {label}
-            </button>
-          ))}
+
+          <button
+            className={`nav-item ${
+              activeSection === "inicio"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("inicio")
+            }
+          >
+            <span>âŒ‚</span>
+            Inicio
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "eventos"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("eventos")
+            }
+          >
+            <span>âœ¦</span>
+            Mis eventos
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "invitados"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("invitados")
+            }
+          >
+            <span>â™™</span>
+            Invitados
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "qr"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("qr")
+            }
+          >
+            <span>ðŸ“</span>
+            CÃ³digos QR
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "confirmaciones"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("confirmaciones")
+            }
+          >
+            <span>âœ“</span>
+            Confirmaciones
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "mapa"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("mapa")
+            }
+          >
+            <span>ðŸ“·</span>
+            Mapa
+          </button>
+
+          <button
+            className={`nav-item ${
+              activeSection === "configuracion"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("configuracion")
+            }
+          >
+            <span>âš™</span>
+            ConfiguraciÃ³n
+          </button>
+
+          <button
+            className={`nav-item premium-nav-item ${
+              activeSection === "premium"
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              changeSection("premium")
+            }
+          >
+            <span>â™›</span>
+            Desbloqueos Premium
+          </button>
+
         </nav>
 
         <div className="sidebar-bottom">
+
           <div className="help-box">
-            <strong>¿Necesitas ayuda?</strong>
-            <p>Configura tu evento paso a paso.</p>
-            <button onClick={() => changeSection("editor")}>Abrir editor</button>
+
+            <strong>
+              ðŸ“·Necesitas ayuda?
+            </strong>
+
+            <p>
+              Configura tu evento paso a paso.
+            </p>
+
+            <button>
+              Ver guÃ­a
+            </button>
+
           </div>
 
           <div className="profile">
-            <div className="avatar">U</div>
-            <div>
-              <strong>Mi cuenta</strong>
-              <span>Plan Gratis</span>
+
+            <div className="avatar">
+              U
             </div>
+
+            <div>
+              <strong>
+                Mi cuenta
+              </strong>
+
+              <span>
+                {premiumEnabled ? "Plan Premium" : "Plan Gratis"}
+              </span>
+            </div>
+
           </div>
+
         </div>
+
       </aside>
 
       <main className="main">
-        {activeSection === "inicio" && renderInicio()}
-        {activeSection === "eventos" && renderEventos()}
-        {activeSection === "editor" && renderEditor()}
-        {activeSection === "invitados" && renderInvitados()}
-        {activeSection === "qr" && renderQR()}
-        {activeSection === "confirmaciones" && renderConfirmaciones()}
-        {activeSection === "mapa" && renderMapa()}
-        {activeSection === "configuracion" && renderConfiguracion()}
-        {activeSection === "premium" && renderPremium()}
+
+        {activeSection === "inicio" &&
+          renderInicio()}
+
+        {activeSection === "eventos" &&
+          renderEventos()}
+
+        {activeSection === "invitados" &&
+          renderInvitados()}
+
+        {activeSection === "qr" &&
+          renderQR()}
+
+        {activeSection === "confirmaciones" &&
+          renderConfirmaciones()}
+
+        {activeSection === "mapa" &&
+          renderMapa()}
+
+        {activeSection === "configuracion" &&
+          renderConfiguracion()}
+
+        {activeSection === "premium" &&
+          renderPremium()}
+
       </main>
 
       {showCreateEvent && (
         <div className="modal-overlay">
+
           <div className="event-modal">
+
             <div className="modal-header">
+
               <div>
+
                 <span className="hero-label">
-                  {editingEventId ? "EDITAR EVENTO" : "NUEVO EVENTO"}
+                  NUEVO EVENTO
                 </span>
-                <h2>{editingEventId ? "Editar evento" : "Crear evento"}</h2>
+
+                <h2>
+                  Crear evento
+                </h2>
+
               </div>
-              <button className="close-button" onClick={() => setShowCreateEvent(false)}>×</button>
+
+              <button
+                className="close-button"
+                onClick={() =>
+                  setShowCreateEvent(false)
+                }
+              >
+                ðŸ“·
+              </button>
+
             </div>
 
             <form onSubmit={createEvent}>
+
               <div className="form-group">
-                <label>Nombre del evento</label>
+
+                <label>
+                  Nombre del evento
+                </label>
+
                 <input
                   type="text"
                   name="name"
-                  placeholder="Ej. Boda de María y Juan"
+                  placeholder="Ej. Boda de MarÃ­a y Juan"
                   value={eventData.name}
                   onChange={handleEventChange}
                 />
+
               </div>
 
               <div className="form-row">
+
                 <div className="form-group">
-                  <label>Fecha</label>
-                  <input type="date" name="date" value={eventData.date} onChange={handleEventChange} />
+
+                  <label>
+                    Fecha
+                  </label>
+
+                  <input
+                    type="date"
+                    name="date"
+                    value={eventData.date}
+                    onChange={handleEventChange}
+                  />
+
                 </div>
+
                 <div className="form-group">
-                  <label>Hora</label>
-                  <input type="time" name="time" value={eventData.time} onChange={handleEventChange} />
+
+                  <label>
+                    Hora
+                  </label>
+
+                  <input
+                    type="time"
+                    name="time"
+                    value={eventData.time}
+                    onChange={handleEventChange}
+                  />
+
                 </div>
+
               </div>
 
               <div className="form-group">
-                <label>Lugar del evento</label>
+
+                <label>
+                  Lugar del evento
+                </label>
+
                 <input
                   type="text"
                   name="location"
-                  placeholder="Ej. Zócalo de Veracruz"
+                  placeholder="Ej. ZÃ³calo de Veracruz"
                   value={eventData.location}
                   onChange={handleEventChange}
                 />
+
               </div>
 
               <div className="form-group">
-                <label>Pases por invitado</label>
-                <select name="passes" value={eventData.passes} onChange={handleEventChange}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{n} {n === 1 ? "pase" : "pases"}</option>
-                  ))}
+
+                <label>
+                  Pases por invitado
+                </label>
+
+                <select
+                  name="passes"
+                  value={eventData.passes}
+                  onChange={handleEventChange}
+                >
+
+                  <option value="1">
+                    1 pase
+                  </option>
+
+                  <option value="2">
+                    2 pases
+                  </option>
+
+                  <option value="3">
+                    3 pases
+                  </option>
+
+                  <option value="4">
+                    4 pases
+                  </option>
+
+                  <option value="5">
+                    5 pases
+                  </option>
+
                 </select>
+
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="cancel-button" onClick={() => setShowCreateEvent(false)}>
+
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() =>
+                    setShowCreateEvent(false)
+                  }
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="create-button">
-                  {editingEventId ? "Guardar cambios" : "Crear evento"}
+
+                <button
+                  type="submit"
+                  className="create-button"
+                >
+                  Crear evento
                 </button>
+
               </div>
+
             </form>
+
           </div>
+
         </div>
       )}
 
       {showAddGuest && (
         <div className="modal-overlay">
+
           <div className="event-modal">
+
             <div className="modal-header">
+
               <div>
-                <span className="hero-label">NUEVO INVITADO</span>
-                <h2>Agregar invitado</h2>
+
+                <span className="hero-label">
+                  NUEVO INVITADO
+                </span>
+
+                <h2>
+                  Agregar invitado
+                </h2>
+
               </div>
-              <button className="close-button" onClick={() => setShowAddGuest(false)}>×</button>
+
+              <button
+                className="close-button"
+                onClick={() =>
+                  setShowAddGuest(false)
+                }
+              >
+                ðŸ“·
+              </button>
+
             </div>
 
             <form onSubmit={addGuest}>
+
               <div className="form-group">
-                <label>Nombre del invitado</label>
+
+                <label>
+                  Nombre del invitado
+                </label>
+
                 <input
                   type="text"
                   name="name"
-                  placeholder="Ej. María López"
+                  placeholder="Ej. MarÃ­a LÃ³pez"
                   value={guestData.name}
                   onChange={handleGuestChange}
                 />
+
               </div>
 
               <div className="form-group">
-                <label>Teléfono</label>
+
+                <label>
+                  TelÃ©fono
+                </label>
+
                 <input
                   type="tel"
                   name="phone"
@@ -1276,90 +2081,312 @@ function App() {
                   value={guestData.phone}
                   onChange={handleGuestChange}
                 />
+
               </div>
 
               <div className="form-group">
-                <label>Pases para este invitado</label>
-                <select name="passes" value={guestData.passes} onChange={handleGuestChange}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>{n} {n === 1 ? "pase" : "pases"}</option>
-                  ))}
+
+                <label>
+                  Pases para este invitado
+                </label>
+
+                <select
+                  name="passes"
+                  value={guestData.passes}
+                  onChange={handleGuestChange}
+                >
+
+                  <option value="1">
+                    1 pase
+                  </option>
+
+                  <option value="2">
+                    2 pases
+                  </option>
+
+                  <option value="3">
+                    3 pases
+                  </option>
+
+                  <option value="4">
+                    4 pases
+                  </option>
+
+                  <option value="5">
+                    5 pases
+                  </option>
+
                 </select>
+
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="cancel-button" onClick={() => setShowAddGuest(false)}>
+
+                <button
+                  type="button"
+                  className="cancel-button"
+                  onClick={() =>
+                    setShowAddGuest(false)
+                  }
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="create-button">
+
+                <button
+                  type="submit"
+                  className="create-button"
+                >
                   Agregar invitado
                 </button>
+
               </div>
+
             </form>
+
           </div>
+
         </div>
       )}
 
       {selectedInvitation && (
         <div className="modal-overlay">
-          <div className="event-modal invitation-modal" style={{ maxWidth: 900, maxHeight: "90vh", overflowY: "auto" }}>
+
+          <div
+            className="event-modal invitation-modal"
+            style={{
+              maxWidth: "900px",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+
             <div className="modal-header">
+
               <div>
-                <span className="hero-label">INVITACIÓN DIGITAL</span>
-                <h2>{selectedInvitation.event.name}</h2>
+
+                <span className="hero-label">
+                  INVITACIÃ“N DIGITAL
+                </span>
+
+                <h2>
+                  {selectedInvitation.event.name}
+                </h2>
+
               </div>
-              <button className="close-button" onClick={() => setSelectedInvitation(null)}>×</button>
+
+              <button
+                className="close-button"
+                onClick={closeInvitation}
+              >
+                ðŸ“·
+              </button>
+
             </div>
 
-            <div style={{ textAlign: "center", padding: "10px 0 25px" }}>
-              <p>Tenemos el gusto de invitar a</p>
-              <h1 style={{ fontSize: 34, margin: "10px 0" }}>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "10px 0 25px",
+              }}
+            >
+
+              <p>
+                Tenemos el gusto de invitar a
+              </p>
+
+              <h1
+                style={{
+                  fontSize: "34px",
+                  margin: "10px 0",
+                }}
+              >
                 {selectedInvitation.guest.name}
               </h1>
-              <p>🎟️ <strong>{selectedInvitation.guest.passes}</strong> pase(s)</p>
 
-              <img
-                src={createQRUrl(selectedInvitation.guest)}
-                alt={`QR de ${selectedInvitation.guest.name}`}
-                width="220"
-                height="220"
-                style={{ borderRadius: 12, margin: "20px 0" }}
-              />
+              <p>
+                ðŸŽŸï¸{" "}
+                <strong>
+                  {selectedInvitation.guest.passes}
+                </strong>{" "}
+                pase(s)
+              </p>
 
-              <p>🔳 Presenta este código QR al ingresar al evento.</p>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  margin: "20px 0",
+                }}
+              >
+
+                <img
+                  src={createQRUrl(
+                    selectedInvitation.guest
+                  )}
+                  alt={`QR de ${selectedInvitation.guest.name}`}
+                  width="220"
+                  height="220"
+                  style={{
+                    borderRadius: "12px",
+                  }}
+                />
+
+              </div>
+
+              <p>
+                ðŸ”³ Presenta este cÃ³digo QR
+                al ingresar al evento.
+              </p>
+
             </div>
 
-            <div className="invitation-details" style={{ display: "grid", gap: 12, marginBottom: 20 }}>
+            <div
+              className="invitation-details"
+              style={{
+                display: "grid",
+                gap: "12px",
+                marginBottom: "20px",
+              }}
+            >
+
               <div className="stat-card">
-                <span>📅 Fecha</span>
-                <strong>{formatDate(selectedInvitation.event.date)}</strong>
+
+                <span>
+                  ðŸ“… Fecha
+                </span>
+
+                <strong>
+                  {formatDate(
+                    selectedInvitation.event.date
+                  )}
+                </strong>
+
               </div>
+
               <div className="stat-card">
-                <span>🕐 Hora</span>
-                <strong>{selectedInvitation.event.time || "Por confirmar"}</strong>
+
+                <span>
+                  ðŸ• Hora
+                </span>
+
+                <strong>
+                  {selectedInvitation.event.time ||
+                    "Por confirmar"}
+                </strong>
+
               </div>
+
               <div className="stat-card">
-                <span>📍 Lugar</span>
-                <strong>{selectedInvitation.event.location}</strong>
+
+                <span>
+                  ðŸ“ Lugar
+                </span>
+
+                <strong>
+                  {selectedInvitation.event.location}
+                </strong>
+
               </div>
+
+            </div>
+
+            <div className="map-card">
+
+              <h3>
+                ðŸ“ UbicaciÃ³n del evento
+              </h3>
+
+              <p>
+                {selectedInvitation.event.location}
+              </p>
+
+              <div className="map-container">
+
+                <iframe
+                  title={`Mapa de ${selectedInvitation.event.name}`}
+                  src={`https://www.openstreetmap.org/export/embed.html?search=${encodeURIComponent(
+                    selectedInvitation.event.location
+                  )}`}
+                  width="100%"
+                  height="350"
+                  style={{
+                    border: 0,
+                    borderRadius: "18px",
+                  }}
+                  loading="lazy"
+                />
+
+              </div>
+
+              <a
+                href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                  selectedInvitation.event.location
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="outline-button map-link"
+                style={{
+                  display: "inline-block",
+                  marginTop: "15px",
+                }}
+              >
+                ðŸ—ºï¸ CÃ³mo llegar
+              </a>
+
             </div>
 
             <div className="modal-actions">
-              <button className="cancel-button" onClick={() => setSelectedInvitation(null)}>
+
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={closeInvitation}
+              >
                 Cerrar
               </button>
+
               <button
+                type="button"
                 className="create-button"
-                onClick={() => window.open(createQRUrl(selectedInvitation.guest), "_blank")}
+                onClick={() =>
+                  window.open(
+                    createQRUrl(
+                      selectedInvitation.guest
+                    ),
+                    "_blank"
+                  )
+                }
               >
                 Abrir QR
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
