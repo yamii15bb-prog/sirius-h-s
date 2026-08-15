@@ -89,6 +89,25 @@ const [supabasePremium, setSupabasePremium] = useState(false);
   const scanTimerRef = useRef(null);
 
   useEffect(() => {
+    if (!cameraActive || !videoRef.current || !streamRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+
+    video.play().catch((error) => {
+      console.error("No se pudo reproducir la cámara:", error);
+    });
+
+    return () => {
+      if (video) {
+        video.pause();
+      }
+    };
+  }, [cameraActive]);
+
+  useEffect(() => {
     localStorage.setItem(
       "siriusHS_events",
       JSON.stringify(events)
@@ -2380,6 +2399,7 @@ return true;
 }
 
 export default App;
+
 
 
 
