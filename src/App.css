@@ -1,7 +1,7 @@
-﻿ /* =========================================================
+/* =========================================================
    SIRIUS H&S
    App.css
-   DiseÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±o negro + dorado / elegante / gÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³tico
+   Diseño negro + dorado / elegante
    ========================================================= */
 
 :root {
@@ -1086,7 +1086,7 @@ body {
 }
 
 .premium-section::before {
-  content: "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Âº";
+  content: "?";
 
   position: absolute;
   right: 35px;
@@ -1209,7 +1209,7 @@ body {
 }
 
 .plan-card li::before {
-  content: "ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“";
+  content: "?";
   margin-right: 8px;
   color: var(--gold);
   font-weight: 900;
@@ -1802,8 +1802,8 @@ select:focus-visible {
 }
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â PREMIUM STUDIO
-   CORRECCIÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“N RESPONSIVE Y ANTI-DESBORDAMIENTO
+   SIRIUS H&S · PREMIUM STUDIO
+   CORRECCIÓN RESPONSIVE Y ANTI-DESBORDAMIENTO
    ========================================================= */
 
 .main {
@@ -2036,12 +2036,12 @@ body,
 
 
 /* =========================================================
-   SIRIUS AI ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â EQUIPO CREATIVO
+   SIRIUS AI · EQUIPO CREATIVO
    ========================================================= */
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ASSISTANT
-   AVATARES LIMPIOS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â SIN ZOOM / SIN SCALE / SIN ANIMACION
+   SIRIUS H&S ? ASSISTANT
+   AVATARES LIMPIOS ? SIN ZOOM / SIN SCALE / SIN ANIMACION
    Heidi + Scarleth
    ========================================================= */
 
@@ -2156,7 +2156,7 @@ body,
 
 /*
    La imagen NO se escala artificialmente.
-   Se mantiene completa dentro del cÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­rculo.
+   Se mantiene completa dentro del c?rculo.
 */
 
 .sirius-avatar-circle img,
@@ -2319,7 +2319,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· CONTROL VISUAL DE AVATARES
+   SIRIUS ? CONTROL VISUAL DE AVATARES
    ========================================================= */
 
 .sirius-avatar-large {
@@ -2391,17 +2391,17 @@ body,
   animation: siriusCelebrating 0.8s ease-in-out infinite !important;
 }
 
-/* ApariciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n */
+/* Aparici?n */
 .sirius-avatar-large.sirius-state-appearing {
   animation: siriusAppearing 0.5s ease-out forwards !important;
 }
 
-/* DesapariciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n */
+/* Desaparici?n */
 .sirius-avatar-large.sirius-state-disappearing {
   animation: siriusDisappearing 0.5s ease-in forwards !important;
 }
 
-/* Comando activo: pequeÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±o resplandor Sirius */
+/* Comando activo: peque?o resplandor Sirius */
 .sirius-avatar-large.sirius-command-active {
   box-shadow:
     0 0 0 5px rgba(212, 175, 55, 0.08),
@@ -2786,7 +2786,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â MOTOR VISUAL DE AVATARES
+   SIRIUS H&S ? MOTOR VISUAL DE AVATARES
    Heidi / Scarleth
    ========================================================= */
 
@@ -3265,7 +3265,7 @@ body,
 }
 
 /* =========================================================
-   ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°XITO
+   ?XITO
    ========================================================= */
 
 .sirius-state-success {
@@ -3349,7 +3349,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â MOTOR VISUAL DE AVATARES
+   SIRIUS H&S ? MOTOR VISUAL DE AVATARES
    Heidi / Scarleth
    ========================================================= */
 
@@ -3828,7 +3828,7 @@ body,
 }
 
 /* =========================================================
-   ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°XITO
+   ?XITO
    ========================================================= */
 
 .sirius-state-success {
@@ -3912,7 +3912,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â MOTOR VISUAL DE AVATARES
+   SIRIUS H&S ? MOTOR VISUAL DE AVATARES
    Heidi / Scarleth
    ========================================================= */
 
@@ -4391,7 +4391,7 @@ body,
 }
 
 /* =========================================================
-   ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°XITO
+   ?XITO
    ========================================================= */
 
 .sirius-state-success {
@@ -4475,9 +4475,9 @@ body,
 
 
 /* =========================================================
-   SIRIUS H&S ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â OVERRIDE VISUAL FINAL
+   SIRIUS H&S ? OVERRIDE VISUAL FINAL
    Las clases ya llegan correctamente desde React.
-   Este bloque fuerza la animaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n sobre el avatar real.
+   Este bloque fuerza la animaci?n sobre el avatar real.
    ========================================================= */
 
 .sirius-avatar-large.sirius-state-happy .sirius-avatar-image-large,
@@ -4548,7 +4548,7 @@ body,
 
 /* =========================================================
    FALLBACKS
-   Si alguna animaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n anterior no existe, estas garantizan
+   Si alguna animaci?n anterior no existe, estas garantizan
    que el estado siga teniendo movimiento visible.
    ========================================================= */
 
@@ -4678,7 +4678,7 @@ body,
   }
 }
 
-/* TambiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©n asegura que la imagen pueda transformarse */
+/* Tambi?n asegura que la imagen pueda transformarse */
 .sirius-avatar-image-large {
   display: block !important;
   transform-origin: center center !important;
@@ -4728,7 +4728,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS AI ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â BLOQUE 3: ESTADOS VISUALES DE LOS AVATARES
+   SIRIUS AI ? BLOQUE 3: ESTADOS VISUALES DE LOS AVATARES
    ========================================================= */
 
 .sirius-assistant-avatar {
@@ -4835,7 +4835,7 @@ body,
 }
 
 /* =========================================================
-   SIRIUS H&S ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ESTUDIO CREATIVO VISUAL
+   SIRIUS H&S ? ESTUDIO CREATIVO VISUAL
    BLOQUE VISUAL UNIFICADO
 ========================================================= */
 
@@ -6001,7 +6001,7 @@ body,
 }
 
 /* =========================================================
-   SIRIUS AVATARES — BLOQUE FINAL DE VIDA
+   SIRIUS AVATARES ? BLOQUE FINAL DE VIDA
    Heidi / Scarleth
    ========================================================= */
 
@@ -6053,14 +6053,14 @@ body,
   transform-origin: center bottom;
 }
 
-/* Cuando Sirius está pensando */
+/* Cuando Sirius est? pensando */
 .sirius-creative-avatar.is-thinking .sirius-avatar-image-large {
   animation:
     siriusAvatarBreathing 2s ease-in-out infinite,
     siriusAvatarThinking 1.2s ease-in-out infinite;
 }
 
-/* Cuando está creando */
+/* Cuando est? creando */
 .sirius-creative-avatar.is-creating .sirius-avatar-image-large {
   animation:
     siriusAvatarBreathing 1.8s ease-in-out infinite,
@@ -6089,7 +6089,7 @@ body,
   opacity: .72;
 }
 
-/* Habla / interacción */
+/* Habla / interacci?n */
 .sirius-avatar-speech {
   position: relative;
   z-index: 3;
@@ -6112,7 +6112,7 @@ body,
   opacity: .6;
 }
 
-/* Selección de avatar */
+/* Selecci?n de avatar */
 .sirius-mini-avatar-button {
   transition:
     transform .25s ease,
@@ -6138,7 +6138,7 @@ body,
   display: block;
 }
 
-/* Respiración */
+/* Respiraci?n */
 @keyframes siriusAvatarBreathing {
   0%, 100% {
     transform: translateY(0) scale(1);
@@ -6162,7 +6162,7 @@ body,
   }
 }
 
-/* Creación */
+/* Creaci?n */
 @keyframes siriusAvatarCreating {
   0%, 100% {
     transform: scale(1);
@@ -6192,8 +6192,8 @@ body,
 
 
 /* =========================================================
-   SIRIUS — AVATARES OFICIALES
-   Imagen única: Heidi izquierda / Scarleth derecha
+   SIRIUS ? AVATARES OFICIALES
+   Imagen ?nica: Heidi izquierda / Scarleth derecha
    ========================================================= */
 
 .sirius-official-avatar {
@@ -6219,12 +6219,12 @@ body,
   -webkit-user-drag: none;
 }
 
-/* HEIDI — mitad izquierda */
+/* HEIDI ? mitad izquierda */
 .sirius-official-avatar-heidi img {
   left: 0;
 }
 
-/* SCARLETH — mitad derecha */
+/* SCARLETH ? mitad derecha */
 .sirius-official-avatar-scarleth img {
   left: -100%;
 }
@@ -6274,7 +6274,7 @@ body,
 
 
 /* =========================================================
-   AVATARES OFICIALES — CONTROL DIRECTO
+   AVATARES OFICIALES ? CONTROL DIRECTO
    ========================================================= */
 
 .sirius-official-avatar {
@@ -6323,7 +6323,7 @@ body,
   left: -100% !important;
 }
 
-/* El componente externo controla la animación,
+/* El componente externo controla la animaci?n,
    nunca la imagen interna */
 .sirius-avatar-large .sirius-official-avatar img {
   transform: none !important;
@@ -6343,7 +6343,7 @@ body,
 
 
 /* =========================================================
-   AVATARES OFICIALES — IMÁGENES INDIVIDUALES
+   AVATARES OFICIALES ? IM?GENES INDIVIDUALES
    Heidi y Scarleth son archivos separados
    ========================================================= */
 
@@ -6383,17 +6383,17 @@ body,
   -webkit-user-drag: none !important;
 }
 
-/* Heidi — imagen individual */
+/* Heidi ? imagen individual */
 .sirius-official-avatar-heidi img {
   left: 50% !important;
 }
 
-/* Scarleth — imagen individual */
+/* Scarleth ? imagen individual */
 .sirius-official-avatar-scarleth img {
   left: 50% !important;
 }
 
-/* Mantener centrado en todos los tamaños */
+/* Mantener centrado en todos los tama?os */
 .sirius-avatar-large .sirius-official-avatar,
 .sirius-mini-avatar .sirius-official-avatar,
 .sirius-preview-avatar .sirius-official-avatar {
@@ -6414,7 +6414,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS — CONTROL FINAL AVATARES INDIVIDUALES
+   SIRIUS ? CONTROL FINAL AVATARES INDIVIDUALES
    ========================================================= */
 
 .sirius-creative-avatar .sirius-avatar-large {
@@ -6478,8 +6478,8 @@ body,
 
 
 /* =========================================================
-   SIRIUS — ANIMACIÓN DE AVATARES OFICIALES
-   La animación pertenece al contenedor, no al JPG
+   SIRIUS ? ANIMACI?N DE AVATARES OFICIALES
+   La animaci?n pertenece al contenedor, no al JPG
    ========================================================= */
 
 .sirius-creative-avatar .sirius-avatar-large {
@@ -6506,7 +6506,7 @@ body,
   animation: siriusOfficialSpeaking 0.55s ease-in-out infinite !important;
 }
 
-/* Flotación */
+/* Flotaci?n */
 @keyframes siriusOfficialFloat {
   0%, 100% {
     transform: translateY(0);
@@ -6556,7 +6556,7 @@ body,
 
 
 /* =========================================================
-   SIRIUS — REACCIONES VISUALES DE AVATARES OFICIALES
+   SIRIUS ? REACCIONES VISUALES DE AVATARES OFICIALES
    Heidi + Scarleth
    ========================================================= */
 
